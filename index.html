@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ONHADA - 고령자 온라인 전시관 플랫폼</title>
+  <style>
+    @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+    /* --- 기본 스타일 --- */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      font-family: 'Pretendard', sans-serif;
+      
+      overflow-x: hidden;
+    }
+
+    /* --- [1] 인트로 섹션 (스크롤 애니메이션) --- */
+    .sticky-stage {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    .sky-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: brightness(0.5);
+      z-index: 0;
+    }
+
+    .wonderland-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      -webkit-mask-image: radial-gradient(circle, black 0%, transparent 0%);
+      mask-image: radial-gradient(circle, black 0%, transparent 0%);
+      mask-repeat: no-repeat;
+      mask-position: center;
+    }
+
+    .wonderland-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* 나비 레이어 */
+    .butterfly-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 500px;
+      height: 500px;
+      transform: translate(-50%, -50%) scale(0.2);
+      opacity: 0.6;
+      z-index: 20;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .butterfly-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: brightness(1.2) contrast(4.5) saturate(1.4);
+      will-change: transform, opacity;
+    }
+
+    /* 인트로 텍스트 UI */
+    .intro-ui {
+      position: absolute;
+      z-index: 50;
+      text-align: center;
+      color: white;
+      opacity: 0;
+      transform: translate(-50%, -40%);
+      top: 50%;
+      left: 50%;
+      transition: all 1s ease;
+      width: 100%;
+      pointer-events: none;
+    }
+
+    .intro-ui h1 {
+      font-size: 7rem;
+      font-weight: 900;
+      margin: 0;
+      letter-spacing: 12px;
+      background: linear-gradient(135deg, #fff 0%, #FFD700 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.3));
+      animation: titleGlow 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes titleGlow {
+      from { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.2)); }
+      to { filter: drop-shadow(0 0 40px rgba(255, 215, 0, 0.5)); }
+    }
+
+    .slogan-single {
+      font-size: 1.5rem;
+      font-weight: 500;
+      letter-spacing: 2px;
+      margin: 20px auto 15px;
+      max-width: 900px;
+      color: #fff;
+      word-break: keep-all;
+      text-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    .slogan-sub {
+      font-size: 1.1rem;
+      font-weight: 300;
+      letter-spacing: 1px;
+      margin: 0 auto 50px;
+      max-width: 900px;
+      color: rgba(255, 255, 255, 0.85);
+      word-break: keep-all;
+      text-shadow: 0 0 8px rgba(0,0,0,0.5);
+    }
+
+    /* 전원 버튼 스타일 */
+    .power-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .power-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .power-btn::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: conic-gradient(transparent, rgba(255, 215, 0, 0.3), transparent 30%);
+      animation: rotate 4s linear infinite;
+      opacity: 0;
+      transition: 0.5s;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .power-svg {
+      width: 40px;
+      height: 40px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2.2;
+      transition: 0.5s;
+      stroke-linecap: round;
+      z-index: 1;
+    }
+
+    .power-btn:hover {
+      border-color: rgba(255, 215, 0, 0.6);
+      transform: scale(1.1);
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
+    }
+
+    .power-btn:hover::before {
+      opacity: 1;
+    }
+
+    .power-btn.active {
+      background: rgba(255, 215, 0, 0.2);
+      border-color: #FFD700;
+      box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+      transform: scale(0.95);
+    }
+
+    .power-btn.active .power-svg {
+      stroke: #FFD700;
+      filter: drop-shadow(0 0 10px #FFD700);
+    }
+
+    /* --- [2] 전환 레이어 (화이트 플래시 & 비전 메시지) --- */
+    .transition-layer-dark {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #050510;
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .vision-box {
+      text-align: center;
+    }
+
+    .vision-text-gold {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 2rem;
+      text-align: center;
+      line-height: 1.8;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: 1.5s ease;
+    }
+
+    .vision-text-gold .highlight-glow {
+      color: #FFD700;
+      font-weight: 800;
+      display: block;
+      margin-top: 15px;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .transition-layer-dark.active .vision-text-gold {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* --- [3] 메인 플랫폼 콘텐츠 스타일 --- */
+    .platform-dark-section {
+      background: radial-gradient(circle at center, #07071c 0%, #020205 100%);
+      padding: 60px 20px;
+      color: #fff;
+      display: block;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .content-section {
+      padding: 100px 0;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .tag-gold {
+      color: #FFD700;
+      font-weight: 700;
+      letter-spacing: 3px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+
+    .title-white {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.2;
+      color: #fff;
+      background: linear-gradient(to bottom, #fff 30%, rgba(255, 255, 255, 0.5) 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+      word-break: keep-all;
+    }
+
+    .section-desc {
+      max-width: 800px;
+      margin: 20px auto 0;
+      font-size: 1.15rem;
+      color: #aaa;
+      line-height: 1.8;
+      word-break: keep-all;
+    }
+
+    .section-divider {
+      border: 0;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(255, 215, 0, 0.15), transparent);
+      margin: 80px 0;
+    }
+
+    /* [섹션 1] 문제 제기 */
+    .problem-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .problem-intro-card {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px dashed rgba(255, 215, 0, 0.15);
+      border-radius: 24px;
+      padding: 35px;
+      text-align: center;
+      margin-bottom: 50px;
+      backdrop-filter: blur(5px);
+    }
+
+    .problem-text-main {
+      font-size: 1.2rem;
+      line-height: 1.8;
+      color: #ddd;
+      word-break: keep-all;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+    }
+
+    .problem-card {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 24px;
+      padding: 40px 30px;
+      text-align: center;
+      transition: all 0.4s;
+    }
+
+    .problem-card:hover {
+      border-color: rgba(239, 68, 68, 0.3);
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(239, 68, 68, 0.05);
+    }
+
+    .problem-icon {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+
+    .problem-card h3 {
+      font-size: 1.4rem;
+      margin-bottom: 15px;
+      color: #fff;
+    }
+
+    .problem-card p {
+      font-size: 0.95rem;
+      color: #aaa;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+
+    /* [섹션 2] 해결책 */
+    .luxury-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 30px;
+    }
+
+    .luxury-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 32px;
+      padding: 50px 30px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .luxury-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+      transition: 0.5s;
+    }
+
+    .luxury-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 215, 0, 0.4);
+      transform: translateY(-15px) scale(1.02);
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 215, 0, 0.1);
+    }
+
+    .luxury-card:hover::after {
+      left: 100%;
+    }
+
+    .card-icon-gold {
+      font-size: 4rem;
+      margin-bottom: 25px;
+      filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.3));
+    }
+
+    .card-info h3 {
+      font-size: 1.6rem;
+      margin-bottom: 15px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .card-info p {
+      font-size: 1rem;
+      color: #aaa;
+      line-height: 1.7;
+      margin-bottom: 30px;
+      word-break: keep-all;
+    }
+
+    .label-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .label-group span {
+      background: rgba(255, 215, 0, 0.1);
+      color: #FFD700;
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      padding: 4px 12px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* [섹션 3] 시범 전시관 */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+    }
+
+    .gallery-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 40px;
+      padding: 10px;
+      overflow: hidden;
+      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    .gallery-item::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), transparent 40%);
+      opacity: 0;
+      transition: 0.5s;
+      pointer-events: none;
+    }
+
+    .gallery-item:hover {
+      transform: translateY(-15px) scale(1.02);
+      border-color: rgba(255, 215, 0, 0.4);
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.1);
+    }
+
+    .gallery-item:hover::before {
+      opacity: 1;
+    }
+
+    .img-box {
+      width: 100%;
+      aspect-ratio: 16/10;
+      background: #000;
+      border-radius: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .img-box::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+    }
+
+    .img-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: 0.6s ease;
+    }
+
+    .gallery-item:hover .img-box img {
+      transform: scale(1.08);
+    }
+
+    .item-desc {
+      padding: 25px 20px;
+      text-align: left;
+    }
+
+    .item-desc span {
+      color: #FFD700;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      display: block;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .item-desc h4 {
+      font-size: 1.4rem;
+      margin: 10px 0;
+      color: #fff;
+    }
+
+    .item-desc p {
+      font-size: 0.95rem;
+      color: #bbb;
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    /* [섹션 4] 전시 가능 작품 */
+    .works-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 25px;
+    }
+
+    .work-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 35px 25px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.4s;
+    }
+
+    .work-card:hover {
+      border-color: rgba(255, 215, 0, 0.4);
+      transform: translateY(-5px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .work-num {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: rgba(255, 215, 0, 0.06);
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      font-family: sans-serif;
+    }
+
+    .work-card h3 {
+      font-size: 1.35rem;
+      color: #fff;
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    .work-card p {
+      font-size: 0.95rem;
+      color: #aaa;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+
+    /* [섹션 5] 소통창구 */
+    .comm-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 20px;
+    }
+
+    .comm-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 35px 20px;
+      text-align: center;
+      transition: all 0.4s;
+    }
+
+    .comm-card:hover {
+      border-color: rgba(255, 215, 0, 0.4);
+      transform: scale(1.03);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .comm-icon {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+    }
+
+    .comm-card h4 {
+      font-size: 1.25rem;
+      color: #fff;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .comm-card p {
+      font-size: 0.9rem;
+      color: #aaa;
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    /* [섹션 6] AI 코칭 앱 */
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 25px;
+    }
+
+    .app-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 35px 25px;
+      text-align: center;
+      transition: all 0.4s;
+    }
+
+    .app-card:hover {
+      border-color: rgba(255, 215, 0, 0.4);
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .app-icon-wrapper {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      width: 70px;
+      height: 70px;
+      background: rgba(255, 215, 0, 0.05);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 20px;
+    }
+
+    .app-card h4 {
+      font-size: 1.35rem;
+      color: #fff;
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    .app-card p {
+      font-size: 0.95rem;
+      color: #aaa;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+
+    /* [섹션 7] 미래 비전 및 굿즈 */
+    .vision-container {
+      margin-top: 60px;
+    }
+
+    .goods-title-wrapper {
+      text-align: center;
+      margin-bottom: 45px;
+    }
+
+    .goods-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    .goods-desc {
+      font-size: 1.05rem;
+      color: #aaa;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    .goods-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 30px;
+      margin-top: 40px;
+    }
+
+    .goods-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 30px;
+      padding: 10px;
+      overflow: hidden;
+      transition: all 0.5s;
+    }
+
+    .goods-item:hover {
+      border-color: rgba(255, 215, 0, 0.4);
+      transform: translateY(-10px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .goods-img-box {
+      width: 100%;
+      aspect-ratio: 16/10;
+      background: #000;
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .goods-img-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: 0.5s;
+    }
+
+    .goods-item:hover .goods-img-box img {
+      transform: scale(1.08);
+    }
+
+    .goods-info {
+      padding: 25px 20px;
+      text-align: left;
+    }
+
+    .goods-info span {
+      color: #FFD700;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .goods-info h4 {
+      font-size: 1.3rem;
+      margin: 10px 0;
+      color: #fff;
+    }
+
+    .goods-info p {
+      font-size: 0.95rem;
+      color: #bbb;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+
+    /* 스크롤 안내 문구 */
+    .scroll-hint {
+      position: absolute;
+      bottom: 60px;
+      z-index: 40;
+      color: #FFD700;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 24px;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 700;
+      animation: bounce 2s infinite;
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      transition: opacity 0.5s;
+      pointer-events: none;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* --- 모바일 반응형 쿼리 고도화 --- */
+    @media (max-width: 768px) {
+      .intro-ui h1 {
+        font-size: 4rem;
+        letter-spacing: 6px;
+      }
+      .slogan-single {
+        font-size: 1.15rem;
+        padding: 0 15px;
+      }
+      .slogan-sub {
+        font-size: 0.95rem;
+        padding: 0 15px;
+      }
+      .title-white {
+        font-size: 2.3rem;
+      }
+      .section-desc {
+        font-size: 1rem;
+      }
+      .content-section {
+        padding: 60px 0;
+      }
+      .problem-text-main {
+        font-size: 1.05rem;
+      }
+      .goods-title {
+        font-size: 1.5rem;
+      }
+    }
+  
+    /* --- CTA 문의 폼 스타일 --- */
+    .cta-form {
+      max-width: 600px;
+      margin: 40px auto 0;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      border-radius: 24px;
+      padding: 35px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+    }
+    .cta-form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .cta-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .cta-form-group.full-width {
+      grid-column: span 2;
+    }
+    .cta-form-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #FFD700;
+      letter-spacing: 0.5px;
+    }
+    .cta-form-control {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #fff;
+      font-size: 0.9rem;
+      font-family: inherit;
+      transition: 0.3s;
+    }
+    .cta-form-control:focus {
+      outline: none;
+      border-color: #FFD700;
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+    }
+    .btn-cta-submit {
+      width: 100%;
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      color: #000;
+      border: none;
+      padding: 15px;
+      font-size: 1rem;
+      font-weight: 800;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(255, 215, 0, 0.2);
+      transition: 0.3s;
+      margin-top: 10px;
+    }
+    .btn-cta-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(255, 215, 0, 0.4);
+    }
+    @media (max-width: 600px) {
+      .cta-form-row {
+        grid-template-columns: 1fr;
+      }
+      .cta-form-group.full-width {
+        grid-column: span 1;
+      }
+    }
+</style>
+</head>
+
+<body>
+
+  <!-- 온하다 웹사이트 단순 인트로 오버레이 -->
+  <div id="websiteIntroOverlay" style="position: fixed; inset: 0; background: #050510; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.8s ease;">
+    <h1 style="font-size: 5rem; font-weight: 900; color: #fff; letter-spacing: 12px; background: linear-gradient(135deg, #fff 0%, #FFD700 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.4)); margin-bottom: 30px;">ONHADA</h1>
+    <p style="color: #aaa; font-size: 1.2rem; margin-bottom: 40px; letter-spacing: 2px;">온라인 전시 아카이브 플랫폼</p>
+    <button onclick="enterWebsite()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 215, 0, 0.3); color: #FFD700; padding: 16px 40px; font-size: 1.1rem; font-weight: 700; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(255, 215, 0, 0.1); transition: 0.3s;" onmouseover="this.style.background='rgba(255, 215, 0, 0.1)'; this.style.transform='scale(1.05)';" onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.transform='scale(1)';">
+      웹사이트 입장하기
+    </button>
+  </div>
+
+  <div id="mainPlatform" class="platform-dark-section">
+    <div class="container">
+      
+      <!-- [섹션 1] 문제 제기 -->
+      <section id="problemSection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">THE PROBLEM</p>
+          <h2 class="title-white">창작은 있었지만,<br>전시와 소통은 부족했습니다</h2>
+        </header>
+        <div class="problem-container">
+          <div class="problem-intro-card">
+            <p class="problem-text-main" style="white-space: pre-line; line-height: 1.8;">
+              기관 프로그램, 취미 활동, 개인 창작 속에서 회상곡, 그림, 전자책, 사진, 글, 영상 같은 다양한 작품이 만들어집니다.
+              
+              하지만 많은 작품은 개인 파일 속에 머물거나, 가까운 사람들에게만 보여지고 끝나는 경우가 많습니다.
+              
+              온하다는 그 작품들이 더 넓게 보여지고, 공감과 소통으로 이어지길 바랍니다.
+            </p>
+          </div>
+          <div class="problem-grid">
+            <div class="problem-card">
+              <div class="problem-icon">📂</div>
+              <h3>창작 후 방치</h3>
+              <p>개인 스마트폰이나 메모리 속 폴더에만 잠들어 잊혀지는 소중한 창작물</p>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon">👤</div>
+              <h3>사회적 고립</h3>
+              <p>가족이나 이웃과 작품을 나눌 적절한 공간이 없어 소통과 인정의 기회 단절</p>
+            </div>
+            <div class="problem-card">
+              <div class="problem-icon">⏸️</div>
+              <h3>창작의 단절</h3>
+              <p>프로그램 시간이 끝난 이후에는 강사 없이 스스로 디지털 창작 활동을 유지하기 어려움</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 2] 해결책 -->
+      <section id="solutionSection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">ONHADA SOLUTION</p>
+          <h2 class="title-white">온하다는 전시관을 모으는 플랫폼입니다</h2>
+          <p class="section-desc">기관별·프로그램별 온라인 전시관을 만들고, 고령자의 작품을 전시·공유·소통할 수 있도록 연결합니다.</p>
+        </header>
+        <div class="luxury-grid">
+          <div class="luxury-card">
+            <div class="card-icon-gold">🏛️</div>
+            <div class="card-info">
+              <h3>기관별 온라인 전시관</h3>
+              <p>복지관, 도서관 등 각 기관 단위로 고유한 전시관을 개설하고 전체 작품을 모아 한곳에서 통합 운영합니다.</p>
+              <div class="label-group">
+                <span>#기관별전시관</span>
+                <span>#프로그램별통합</span>
+              </div>
+            </div>
+          </div>
+          <div class="luxury-card">
+            <div class="card-icon-gold">💬</div>
+            <div class="card-info">
+              <h3>소통창구 연결</h3>
+              <p>좋아요, 응원 댓글, 배우고 싶어요 등의 소통 장치를 통해 가족 및 지역사회와 끊임없이 교류합니다.</p>
+              <div class="label-group">
+                <span>#고립감해소</span>
+                <span>#이웃소통</span>
+              </div>
+            </div>
+          </div>
+          <div class="luxury-card">
+            <div class="card-icon-gold">✍️</div>
+            <div class="card-info">
+              <h3>AI 코칭·창작 앱</h3>
+              <p>강사가 없는 환경에서도 스마트폰을 활용해 고령자가 쉽게 디지털 작품 창작을 이어가도록 돕습니다.</p>
+              <div class="label-group">
+                <span>#지속가능한창작</span>
+                <span>#쉬운AI도구</span>
+              </div>
+            </div>
+          </div>
+          <div class="luxury-card">
+            <div class="card-icon-gold">👑</div>
+            <div class="card-info">
+              <h3>개인 전시관 확장</h3>
+              <p>수강생 개인의 작품만을 모은 모바일 개인전(1인 전시관)을 쉽게 구축하고 QR코드로 공유합니다.</p>
+              <div class="label-group">
+                <span>#1인전시관</span>
+                <span>#QR코드공유</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 3] 시범 전시관 -->
+      <section id="gallerySection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">DEMO PLATFORM</p>
+          <h2 class="title-white">기관별·프로그램별 온라인 전시관 시범 모델</h2>
+          <p class="section-desc">현재 실제 현장에서 활용 예정인 기관별 온라인 전시관 프로토타입입니다. 복지관, 도서관, 평생교육기관 등 다양한 공간에서 독립된 형태로 시범 운영됩니다.</p>
+        </header>
+        <div class="gallery-grid">
+          <div class="gallery-item">
+            <div class="img-box">
+              <img src="온라인 전시장 .png" alt="상상의 바다 갤러리">
+            </div>
+            <div class="item-desc">
+              <span>Institution Demo 01</span>
+              <h4>상상의 바다 갤러리</h4>
+              <p>AI 동화책 제작 프로그램의 결과물과 단체 협동 창작물들을 바다 테마 속에서 다채롭게 보여줍니다.</p>
+            </div>
+          </div>
+          <div class="gallery-item">
+            <div class="img-box">
+              <img src="온아트상세.png" alt="상상의 빛 갤러리">
+            </div>
+            <div class="item-desc">
+              <span>Institution Demo 02</span>
+              <h4>상상의 빛 갤러리</h4>
+              <p>고령자분들이 외부 AI 이미지 생성기로 그린 개성 넘치는 디지털 아트 작품들을 전문적으로 전시합니다.</p>
+            </div>
+          </div>
+          <div class="gallery-item">
+            <div class="img-box">
+              <img src="온뮤지엄 상세.png" alt="빛의 사운드 뮤지엄">
+            </div>
+            <div class="item-desc">
+              <span>Institution Demo 03</span>
+              <h4>빛의 사운드 뮤지엄</h4>
+              <p>AI 작사 및 보컬 제너레이터로 만들어진 시니어만의 음악과 뮤직비디오 영상을 감상하는 멀티미디어 관람관입니다.</p>
+            </div>
+          </div>
+          <div class="gallery-item">
+            <div class="img-box">
+              <img src="디카시 상세페이지.png" alt="디카시정원">
+            </div>
+            <div class="item-desc">
+              <span>Institution Demo 04</span>
+              <h4>디카시정원</h4>
+              <p>스마트폰 카메라로 일상을 촬영하고 이에 어울리는 감성적인 자작 시를 결합해 전시하는 디카시 전용 공간입니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 4] 전시 가능한 작품 -->
+      <section id="worksSection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">EXHIBITABLE WORKS</p>
+          <h2 class="title-white">AI 작품만이 아닙니다</h2>
+          <p class="section-desc">온하다는 첨단 AI 기술 창작물에 국한되지 않고, 고령자의 손끝에서 만들어진 아날로그 결과물부터 다양한 디지털 포맷까지 폭넓게 수용합니다.</p>
+        </header>
+        <div class="works-grid">
+          <div class="work-card">
+            <span class="work-num">01</span>
+            <h3>AI 이미지</h3>
+            <p>다양한 생성형 AI 툴을 활용해 시니어가 직접 구상하고 그려낸 디지털 일러스트</p>
+          </div>
+          <div class="work-card">
+            <span class="work-num">02</span>
+            <h3>사진</h3>
+            <p>스마트폰으로 포착한 동네 풍경, 꽃, 일상의 다정한 찰나들을 모은 스냅샷</p>
+          </div>
+          <div class="work-card">
+            <span class="work-num">03</span>
+            <h3>글 / 시 / 디카시</h3>
+            <p>인생의 회고와 따뜻한 지혜가 녹아 있는 시, 에세이, 사진과 글의 결합</p>
+          </div>
+          <div class="work-card">
+            <span class="work-num">04</span>
+            <h3>영상</h3>
+            <p>스마트폰 편집 앱으로 제작한 자막이 있는 슬라이드 쇼 및 숏폼 영상</p>
+          </div>
+          <div class="work-card">
+            <span class="work-num">05</span>
+            <h3>음악</h3>
+            <p>AI 작사 프로그램을 사용해 직접 작사하고 멜로디를 붙인 오리지널 음원</p>
+          </div>
+          <div class="work-card">
+            <span class="work-num">06</span>
+            <h3>수공예 / 취미</h3>
+            <p>서예, 꽃꽂이, 뜨개질, 점토 공예 등 복지관 취미반에서 완성한 물리적인 작품들의 사진</p>
+          </div>
+          <div class="work-card">
+            <span class="work-num">07</span>
+            <h3>외부 링크</h3>
+            <p>이미 공개된 유튜브 영상, 개인 블로그 등 시니어가 기록해 오던 기존 채널 연동</p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 5] 소통창구 -->
+      <section id="communicationSection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">SOCIAL CONNECTION</p>
+          <h2 class="title-white">전시는 소통의 시작입니다</h2>
+          <p class="section-desc">단순한 작품 감상을 넘어 관람객과의 적극적인 피드백을 통해 고령자의 사회적 성취감을 고취하고 우울감을 해소합니다.</p>
+        </header>
+        <div class="comm-grid">
+          <div class="comm-card">
+            <div class="comm-icon">❤️</div>
+            <h4>좋아요</h4>
+            <p>작품에 대한 따뜻한 관심과 긍정의 피드백</p>
+          </div>
+          <div class="comm-card">
+            <div class="comm-icon">💬</div>
+            <h4>응원 댓글</h4>
+            <p>작품 아래에 남겨지는 이웃과 가족들의 격려 메시지</p>
+          </div>
+          <div class="comm-card">
+            <div class="comm-icon">🌟</div>
+            <h4>감상 보내기</h4>
+            <p>작품을 통해 느낀 뭉클한 감동과 삶의 교감을 전달</p>
+          </div>
+          <div class="comm-card">
+            <div class="comm-icon">🤝</div>
+            <h4>배우고 싶어요</h4>
+            <p>해당 기술이나 재능을 다른 주민들과 교류·공유할 수 있는 문의 창구</p>
+          </div>
+          <div class="comm-card">
+            <div class="comm-icon">📞</div>
+            <h4>문의하기</h4>
+            <p>기관 또는 전시 담당자와의 네트워킹 및 전시 교류</p>
+          </div>
+          <div class="comm-card">
+            <div class="comm-icon">🔗</div>
+            <h4>가족에게 공유</h4>
+            <p>자신만의 고유 전시관 주소를 가족 모임 방에 쉽게 전달</p>
+          </div>
+          <div class="comm-card">
+            <div class="comm-icon">👥</div>
+            <h4>지역사회 관람</h4>
+            <p>마을 공동체와 연계하여 주민 누구나 QR과 키오스크로 자유롭게 관람</p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 6] AI 코칭·창작 앱 -->
+      <section id="coachingSection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">AI COACHING TOOLKIT</p>
+          <h2 class="title-white">강사가 없어도 창작을 이어가도록</h2>
+          <p class="section-desc">전시가 일회성으로 끝나지 않도록 돕습니다. 고령자의 디지털 이해도에 맞춤화된 AI 코칭·창작 앱을 연결하여 지속적인 창작 활동을 보장합니다.</p>
+        </header>
+        <div class="app-grid">
+          <div class="app-card">
+            <div class="app-icon-wrapper">🔄</div>
+            <h4>딸깍 복사방</h4>
+            <p>복잡한 프롬프트 입력 대신 마음에 드는 스타일의 카드만 선택해 이미지를 생성하는 복제 도구</p>
+          </div>
+          <div class="app-card">
+            <div class="app-icon-wrapper">📝</div>
+            <h4>AI 작사하기</h4>
+            <p>어릴 적 기억이나 감정을 선택하면 인공지능이 서정적인 시와 노랫말로 다듬어주는 글쓰기 조력자</p>
+          </div>
+          <div class="app-card">
+            <div class="app-icon-wrapper">🎴</div>
+            <h4>AI 프롬프트 카드북</h4>
+            <p>실제 손으로 넘기는 카드처럼 구현되어 단어를 조합해 손쉽게 그림 명령어를 완성하는 직관적인 교구</p>
+          </div>
+          <div class="app-card">
+            <div class="app-icon-wrapper">🎨</div>
+            <h4>온 에디터</h4>
+            <p>글자 크기를 대폭 늘리고 필수 버튼만 배치하여 사진에 글씨를 얹거나 필터를 적용하는 실버 맞춤 에디터</p>
+          </div>
+          <div class="app-card">
+            <div class="app-icon-wrapper">🎵</div>
+            <h4>온뮤직</h4>
+            <p>작사한 가사와 분위기(트로트, 포크 등)를 선택하면 나만의 노래 음원을 즉각 합성해 주는 음악 도구</p>
+          </div>
+          <div class="app-card">
+            <div class="app-icon-wrapper">🎞️</div>
+            <h4>ON Toon Ani</h4>
+            <p>내가 그린 캐릭터나 작품이 움직이는 간단한 툰 및 숏폼 무비를 쉽게 제작하는 애니메이션 엔진</p>
+          </div>
+          <div class="app-card">
+            <div class="app-icon-wrapper">🚀</div>
+            <h4>크리에이터 도우미</h4>
+            <p>완성된 음악이나 영상을 유튜브 숏폼 포맷으로 자동 변환해 원터치로 업로드하는 숏폼 매니저</p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 7] 미래 비전 및 실물 굿즈 연계 -->
+      <section id="visionSection" class="content-section">
+        <header class="section-header">
+          <p class="tag-gold">FUTURE VISION</p>
+          <h2 class="title-white">기관 중심 실증에서 세대 연결 플랫폼으로</h2>
+          <p class="section-desc">초기에는 복지관, 도서관, 평생학습관 등 고령자 대상 공공·복지 기관을 거점으로 삼아 실증합니다. 이후 개인 전시관 개방, 재능 마켓, 그리고 모든 세대가 디지털로 함께 소통하는 세대 연결형 플랫폼으로 확장해 나갈 계획입니다.</p>
+        </header>
+        
+        <div class="vision-container">
+          <div class="goods-title-wrapper">
+            <h3 class="goods-title">실물 연계 확장 모델</h3>
+            <p class="goods-desc">온라인 공간을 넘어 소장 가치가 높은 시니어 전용 실물 연계 굿즈로 제작되어 일상의 큰 기쁨과 연결됩니다.</p>
+          </div>
+          
+          <div class="goods-grid">
+            <div class="goods-item">
+              <div class="goods-img-box">
+                <img src="뮤직북 완성.png" alt="AI 뮤직북">
+              </div>
+              <div class="goods-info">
+                <span>Goods Model 01</span>
+                <h4>AI 뮤직북 (그림책)</h4>
+                <p>내가 창작한 동화와 가사가 고급 양장본 그림책으로 출판되는 평생의 기념품</p>
+              </div>
+            </div>
+            
+            <div class="goods-item">
+              <div class="goods-img-box">
+                <img src="무드등 완성.png" alt="AI 무드등">
+              </div>
+              <div class="goods-info">
+                <span>Goods Model 02</span>
+                <h4>AI 감성 무드등</h4>
+                <p>시니어가 직접 생성한 시와 어울리는 아크릴 각인 아트로 밤을 은은하게 밝히는 굿즈</p>
+              </div>
+            </div>
+            
+            <div class="goods-item">
+              <div class="goods-img-box">
+                <img src="머그컵 완성.png" alt="AI 머그컵">
+              </div>
+              <div class="goods-info">
+                <span>Goods Model 03</span>
+                <h4>AI 라이프 머그컵</h4>
+                <p>나만의 추억 그림이나 시구가 인쇄되어 가족에게 선물하기 좋은 커스텀 컵</p>
+              </div>
+            </div>
+            
+            <div class="goods-item">
+              <div class="goods-img-box">
+                <img src="뮤직카드 완성.png" alt="AI 뮤직카드">
+              </div>
+              <div class="goods-info">
+                <span>Goods Model 04</span>
+                <h4>스마트 뮤직카드</h4>
+                <p>QR코드가 결합되어 스마트폰으로 즉각 음악과 전시를 재생할 수 있는 엽서</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- [섹션 8] 기관 도입 문의 및 CTA -->
+      <section id="ctaSection" class="content-section" style="text-align: center; padding: 80px 0; border-top: 1px solid rgba(255,255,255,0.05);">
+        <div class="cta-card" style="max-width: 900px; margin: 0 auto; padding: 60px 40px; background: linear-gradient(135deg, rgba(255, 215, 0, 0.04) 0%, rgba(5, 5, 16, 0.8) 100%); border: 1px solid rgba(255, 215, 0, 0.2); border-radius: 40px; box-shadow: 0 40px 80px rgba(0,0,0,0.6);">
+          <p class="tag-gold" style="margin-bottom: 15px; font-weight:700;">PARTNERSHIP</p>
+          <h2 class="title-white" style="font-size: 2.8rem; margin-bottom: 20px; color:#fff; font-weight:800;">온하다 플랫폼 시범 도입 기관을 모집합니다</h2>
+          <p class="section-desc" style="margin-bottom: 40px; font-size: 1.15rem; max-width: 700px; margin-left: auto; margin-right: auto; color:#aaa; line-height:1.7;">
+            우리 기관 수강생들을 위한 전용 1인 전시관을 개설하고, AI 창작 코칭 앱을 연동하여 디지털 문화 선도 기관으로서 실증에 참여해 보세요.
+          </p>
+          <div class="cta-buttons" style="display:flex; justify-content:center; gap:20px; margin-bottom:40px; flex-wrap:wrap;">
+            <a href="app.html" class="cta-btn-primary" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #000; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-weight: 800; font-size: 1rem; box-shadow: 0 5px 15px rgba(255,215,0,0.2); transition: 0.3s; display:inline-block;">🚀 온하다 플랫폼 MVP 실행하기</a>
+            <a href="#" class="cta-btn-secondary" onclick="alert('사업 제안서 및 리플렛 다운로드가 곧 준비됩니다.'); return false;" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); color: #fff; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-weight: 700; font-size: 1rem; transition: 0.3s; display:inline-block;">제안서 다운로드 (PDF)</a>
+          </div>
+
+          <!-- 시범 도입 문의 신청 폼 -->
+          <form class="cta-form" onsubmit="submitInquiry(event)">
+            <h3 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 25px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">🏫 온하다 무료 시범 도입 및 상담 신청</h3>
+            
+            <div class="cta-form-row">
+              <div class="cta-form-group">
+                <label class="cta-form-label" for="inquiryOrg">소속 기관/지자체명</label>
+                <input type="text" id="inquiryOrg" class="cta-form-control" placeholder="예: 동래구 노인복지관" required>
+              </div>
+              <div class="cta-form-group">
+                <label class="cta-form-label" for="inquiryName">담당자 성함 / 직함</label>
+                <input type="text" id="inquiryName" class="cta-form-control" placeholder="예: 홍길동 과장" required>
+              </div>
+            </div>
+
+            <div class="cta-form-row">
+              <div class="cta-form-group">
+                <label class="cta-form-label" for="inquiryPhone">연락처</label>
+                <input type="tel" id="inquiryPhone" class="cta-form-control" placeholder="예: 010-1234-5678" required>
+              </div>
+              <div class="cta-form-group">
+                <label class="cta-form-label" for="inquiryEmail">이메일 주소</label>
+                <input type="email" id="inquiryEmail" class="cta-form-control" placeholder="예: contact@welfare.or.kr" required>
+              </div>
+            </div>
+
+            <div class="cta-form-group full-width" style="margin-bottom: 25px;">
+              <label class="cta-form-label" for="inquiryMsg">문의 및 요청사항 (선택)</label>
+              <textarea id="inquiryMsg" class="cta-form-control" rows="3" placeholder="도입 시기, 대상 인원 등 상세 요청을 적어주세요."></textarea>
+            </div>
+
+            <button type="submit" class="btn-cta-submit">🏫 시범 도입 신청 및 상담 접수</button>
+          </form>
+        </div>
+      </section>
+
+
+    </div>
+  </div>
+
+  <script>
+    function enterWebsite() {
+      const overlay = document.getElementById('websiteIntroOverlay');
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 800);
+    }
+  
+    function submitInquiry(event) {
+      event.preventDefault();
+      const org = document.getElementById('inquiryOrg').value;
+      const name = document.getElementById('inquiryName').value;
+      const phone = document.getElementById('inquiryPhone').value;
+      const email = document.getElementById('inquiryEmail').value;
+      
+      alert('시범 도입 문의 신청이 성공적으로 접수되었습니다!\n\n소속: ' + org + '\n담당자: ' + name + '\n\n기입해주신 연락처(' + phone + ')와 이메일(' + email + ')로 온하다 종합 사업 제안서 및 실증 가이드북을 발송해 드리겠습니다.');
+      
+      document.getElementById('inquiryOrg').value = '';
+      document.getElementById('inquiryName').value = '';
+      document.getElementById('inquiryPhone').value = '';
+      document.getElementById('inquiryEmail').value = '';
+      const msg = document.getElementById('inquiryMsg');
+      if (msg) msg.value = '';
+    }
+</script>
+  </body>
+
+</html>
