@@ -1681,6 +1681,48 @@
         grid-template-columns: 1fr !important;
       }
     }
+
+    /* 실시간 알림 티커 스타일 */
+    .ticker-container {
+      background: #0c0c22;
+      border-radius: 10px;
+      padding: 20px 30px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+    .ticker-label {
+      font-weight: 900;
+      font-size: 1.1rem;
+      position: relative;
+      z-index: 10;
+      background: #0c0c22;
+      padding-right: 15px;
+      box-shadow: 10px 0 15px -5px #0c0c22;
+    }
+    .ticker-content {
+      animation: tickerScroll 25s linear infinite;
+      display: flex;
+      font-size: 1.1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 768px) {
+      .ticker-container {
+        padding: 15px 20px !important;
+      }
+      .ticker-label {
+        font-size: 0.95rem !important;
+        padding-right: 10px !important;
+        background: #0c0c22 !important;
+      }
+      .ticker-content {
+        font-size: 0.95rem !important;
+      }
+    }
 </style>
 </head>
 <body>
@@ -1846,9 +1888,9 @@
         </div>
 
         <!-- 4. 실시간 동향 피드 Ticker (Live Feeds Ticker) -->
-        <div style="background: rgba(255,255,255,0.02); border-left: 5px solid var(--accent-color); border-radius: 10px; padding: 20px 30px; display: flex; align-items: center; gap: 20px; overflow: hidden; white-space: nowrap;">
-          <span style="font-weight: 900; color: var(--accent-color); font-size: 1.1rem; flex-shrink: 0;">📢 실시간 플랫폼 소식:</span>
-          <div style="animation: tickerScroll 25s linear infinite; display: flex; gap: 50px; font-size: 1.1rem; color: #ddd;">
+        <div class="ticker-container" style="border-left: 5px solid var(--accent-color); gap: 20px;">
+          <span class="ticker-label" style="color: var(--accent-color); flex-shrink: 0;">📢 실시간 소식:</span>
+          <div class="ticker-content" style="gap: 50px; color: #ddd;">
             <span>🌸 [동래구 노인복지관] '김순자 작가님'의 신규 민들레 사진 시집이 승인되어 1인 회고관에 게시되었습니다! (방금 전)</span>
             <span>⛵ [중구 평생학습관] '상상의 바다 갤러리' 가상 VR 전시관의 방문객이 300명을 돌파했습니다! (10분 전)</span>
             <span>💡 [금정구 노인복지관] '최말순 어르신'이 굿즈 디자인 도안 컵 제작을 완료 신청하셨습니다. (34분 전)</span>
