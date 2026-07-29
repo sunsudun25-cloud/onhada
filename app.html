@@ -1573,6 +1573,25 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
     }
+    .stats-split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 30px;
+      margin-bottom: 50px;
+    }
+    .stats-sub-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+    }
+    
+    /* 데스크탑/모바일 전용 인라인 도우미 */
+    .desktop-only-inline {
+      display: inline !important;
+    }
+    .mobile-only-inline {
+      display: none !important;
+    }
 
     /* --- 모바일 반응형 스타일 고도화 --- */
     @media (max-width: 768px) {
@@ -1722,6 +1741,19 @@
       .ticker-content {
         font-size: 0.95rem !important;
       }
+      .stats-split-grid {
+        grid-template-columns: 1fr !important;
+        gap: 25px !important;
+      }
+      .stats-sub-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      .desktop-only-inline {
+        display: none !important;
+      }
+      .mobile-only-inline {
+        display: inline !important;
+      }
     }
 </style>
 </head>
@@ -1745,7 +1777,7 @@
     <div class="intro-ui" id="introUI">
       <h1>ONHADA</h1>
       <p class="slogan-single">온라인 전시관 플랫폼</p>
-      <p style="color: rgba(255, 215, 0, 0.95); font-weight: 600; margin-bottom: 25px; font-size: 1.05rem; letter-spacing: 1px;">🏫 전원 버튼을 클릭하여 온하다 메인 제어반을 켜세요.</p>
+      <p style="color: rgba(255, 215, 0, 0.95); font-weight: 600; margin-bottom: 25px; font-size: 1.05rem; letter-spacing: 1px;">아래 버튼을 눌러 온하다를 시작하세요.</p>
       <div class="power-zone">
         <button class="power-btn" id="powerOnBtn">
           <svg class="power-svg" viewBox="0 0 32 32">
@@ -1817,38 +1849,77 @@
       <!-- ============================================== -->
       <div id="view-portal-home" class="app-view active">
         <!-- 1. 플랫폼 비전 & 헤더 타이틀 -->
-        <div class="view-title-bar" style="text-align: center; margin-bottom: 50px;">
+        <div class="view-title-bar" style="text-align: center; margin-bottom: 40px;">
           <h2>온하다 연합 전시 플랫폼</h2>
           <p style="font-size: 1.3rem !important; color: var(--accent-color) !important; font-weight: 800; margin-top: 10px;">
             기술이 세대를 연결하여 사회적 참여와 따뜻한 소통을 켜다(ON)
           </p>
         </div>
 
-        <!-- 2. 실시간 플랫폼 에코시스템 상태판 (Live Metrics Dashboard) -->
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 30px; padding: 35px 50px; margin-bottom: 50px; text-align: center;">
-          <h3 style="font-size: 1.5rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">📈 실시간 플랫폼 생태계 연동 보드</h3>
-          <div class="eco-stats-grid" style="gap: 20px;">
-            <!-- 메트릭 1 -->
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 25px 15px;">
-              <span style="font-size: 2.3rem; font-weight: 900; color: var(--accent-color); display: block; margin-bottom: 8px;" id="count-centers">12</span>
-              <span style="font-size: 1.1rem; color: #eee; font-weight: 700;">연합 복지기관수</span>
+        <!-- MVP 데모 안내 배너 -->
+        <div style="background: rgba(255, 215, 0, 0.05); border: 1px solid rgba(255, 215, 0, 0.2); border-radius: 16px; padding: 15px 25px; margin-bottom: 35px; text-align: center; max-width: 900px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+          <span style="color: var(--accent-color); font-weight: 800; font-size: 0.95rem; display: block; margin-bottom: 4px;">⚠️ MVP DEMO NOTICE</span>
+          <span style="font-size: 0.9rem; color: #eee; word-break: keep-all;">본 화면은 온하다 플랫폼의 향후 확장 운영 구조를 보여주는 MVP 데모입니다. 일부 기관명·작가명·통계는 서비스 시나리오를 설명하기 위한 예시 데이터이며, 실제 현장 실증 현황은 별도로 표시합니다.</span>
+        </div>
+
+        <!-- 2. 플랫폼 운영 상태판 (실제 실증 vs 확장 예시) -->
+        <div class="stats-split-grid">
+          
+          <!-- 실제 실증 현황 -->
+          <div style="background: rgba(46, 204, 113, 0.03); border: 1.5px solid rgba(46, 204, 113, 0.25); border-radius: 30px; padding: 35px 30px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <h3 style="font-size: 1.45rem; color: #2ecc71; margin-bottom: 20px; font-weight: 900; letter-spacing: -0.5px;">🟢 현재 실증 현황</h3>
+              <div class="stats-sub-grid">
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(46,204,113,0.15); border-radius: 20px; padding: 20px 10px;">
+                  <span style="font-size: 2rem; font-weight: 900; color: #2ecc71; display: block; margin-bottom: 6px;">2곳</span>
+                  <span style="font-size: 0.95rem; color: #eee; font-weight: 700;">연계 기관</span>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(46,204,113,0.15); border-radius: 20px; padding: 20px 10px;">
+                  <span style="font-size: 2rem; font-weight: 900; color: #2ecc71; display: block; margin-bottom: 6px;">28명</span>
+                  <span style="font-size: 0.95rem; color: #eee; font-weight: 700;">참여 시니어</span>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(46,204,113,0.15); border-radius: 20px; padding: 20px 10px;">
+                  <span style="font-size: 2rem; font-weight: 900; color: #2ecc71; display: block; margin-bottom: 6px;">2개</span>
+                  <span style="font-size: 0.95rem; color: #eee; font-weight: 700;">운영 전시관</span>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(46,204,113,0.15); border-radius: 20px; padding: 20px 10px;">
+                  <span style="font-size: 2rem; font-weight: 900; color: #2ecc71; display: block; margin-bottom: 6px;">35점</span>
+                  <span style="font-size: 0.95rem; color: #eee; font-weight: 700;">등록 작품</span>
+                </div>
+              </div>
             </div>
-            <!-- 메트릭 2 -->
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 25px 15px;">
-              <span style="font-size: 2.3rem; font-weight: 900; color: #a855f7; display: block; margin-bottom: 8px;" id="count-seniors">154</span>
-              <span style="font-size: 1.1rem; color: #eee; font-weight: 700;">등록 시니어 작가수</span>
-            </div>
-            <!-- 메트릭 3 -->
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 25px 15px;">
-              <span style="font-size: 2.3rem; font-weight: 900; color: #06b6d4; display: block; margin-bottom: 8px;" id="count-works">1,420</span>
-              <span style="font-size: 1.1rem; color: #eee; font-weight: 700;">총 전시 작품수</span>
-            </div>
-            <!-- 메트릭 4 -->
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 25px 15px;">
-              <span style="font-size: 2.3rem; font-weight: 900; color: #f43f5e; display: block; margin-bottom: 8px;" id="count-views">12,890</span>
-              <span style="font-size: 1.1rem; color: #eee; font-weight: 700;">누적 관람수</span>
+            <div style="margin-top: 20px; background: rgba(46,204,113,0.1); padding: 10px 15px; border-radius: 12px; font-size: 0.95rem; color: #2ecc71; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+              <span>⚡ 현재 작품 추가 업로드 진행 중</span>
             </div>
           </div>
+
+          <!-- 확장 운영 예시 데이터 (기존 통계 데이터) -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 30px; padding: 35px 30px; text-align: center;">
+            <h3 style="font-size: 1.45rem; color: #aaa; margin-bottom: 20px; font-weight: 900; letter-spacing: -0.5px;">📈 확장 운영 예시 데이터</h3>
+            <div class="eco-stats-grid" style="gap: 15px;">
+              <!-- 메트릭 1 -->
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 10px; position: relative;">
+                <span style="font-size: 2rem; font-weight: 900; color: var(--accent-color); display: block; margin-bottom: 6px;"><span id="count-centers">12</span> <small style="font-size: 0.8rem; font-weight: 700; color: rgba(255,215,0,0.6); margin-left: 2px;">DEMO</small></span>
+                <span style="font-size: 0.95rem; color: #bbb; font-weight: 700;">연합 복지기관수</span>
+              </div>
+              <!-- 메트릭 2 -->
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 10px;">
+                <span style="font-size: 2rem; font-weight: 900; color: #a855f7; display: block; margin-bottom: 6px;"><span id="count-seniors">154</span> <small style="font-size: 0.8rem; font-weight: 700; color: rgba(168,85,247,0.6); margin-left: 2px;">DEMO</small></span>
+                <span style="font-size: 0.95rem; color: #bbb; font-weight: 700;">등록 시니어 작가수</span>
+              </div>
+              <!-- 메트릭 3 -->
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 10px;">
+                <span style="font-size: 2rem; font-weight: 900; color: #06b6d4; display: block; margin-bottom: 6px;"><span id="count-works">1,420</span> <small style="font-size: 0.8rem; font-weight: 700; color: rgba(6,182,212,0.6); margin-left: 2px;">DEMO</small></span>
+                <span style="font-size: 0.95rem; color: #bbb; font-weight: 700;">총 전시 작품수</span>
+              </div>
+              <!-- 메트릭 4 -->
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 10px;">
+                <span style="font-size: 2rem; font-weight: 900; color: #f43f5e; display: block; margin-bottom: 6px;"><span id="count-views">12,890</span> <small style="font-size: 0.8rem; font-weight: 700; color: rgba(244,63,94,0.6); margin-left: 2px;">DEMO</small></span>
+                <span style="font-size: 0.95rem; color: #bbb; font-weight: 700;">누적 관람수</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- 3. 역할별 다자간 진입로 (Role-Based Action Portals) -->
@@ -1880,7 +1951,7 @@
             <div style="font-size: 3.5rem; margin-bottom: 20px;">🏢</div>
             <h4 style="font-size: 1.45rem; font-weight: 900; color: #fff; margin-bottom: 15px;">복지관 / 기관 관리자</h4>
             <p style="font-size: 1.15rem !important; color: #ddd !important; line-height: 1.7 !important; margin-bottom: 30px; flex-grow: 1;">
-              단 3초 만에 우리 기관 전용 온라인 테마 전시관을 무제한 개설하고, 어르신들의 창작품 제출/승인 현황을 실시간 보드로 투명하게 관리하세요.
+              기관별 온라인 전시관을 개설하고 작품 제출·승인 현황을 관리합니다. (시범 운영 예시 기능)
             </p>
             <button class="btn-hero-primary" onclick="switchUserRoleAndGo('operator', 'apply')" style="width: 100%; height: 52px; font-size: 1.1rem; background: #06b6d4; border-color: #06b6d4;">기관용 전시관 개설/관리 진입 ➔</button>
           </div>
@@ -1889,11 +1960,14 @@
 
         <!-- 4. 실시간 동향 피드 Ticker (Live Feeds Ticker) -->
         <div class="ticker-container" style="border-left: 5px solid var(--accent-color); gap: 20px;">
-          <span class="ticker-label" style="color: var(--accent-color); flex-shrink: 0;">📢 실시간 소식:</span>
+          <span class="ticker-label" style="color: var(--accent-color); flex-shrink: 0;">
+            <span class="desktop-only-inline">📢 플랫폼 운영 시나리오 예시:</span>
+            <span class="mobile-only-inline" style="display:none;">📢 시나리오 예시:</span>
+          </span>
           <div class="ticker-content" style="gap: 50px; color: #ddd;">
-            <span>🌸 [동래구 노인복지관] '김순자 작가님'의 신규 민들레 사진 시집이 승인되어 1인 회고관에 게시되었습니다! (방금 전)</span>
-            <span>⛵ [중구 평생학습관] '상상의 바다 갤러리' 가상 VR 전시관의 방문객이 300명을 돌파했습니다! (10분 전)</span>
-            <span>💡 [금정구 노인복지관] '최말순 어르신'이 굿즈 디자인 도안 컵 제작을 완료 신청하셨습니다. (34분 전)</span>
+            <span>🌸 [동래구 노인복지관] '김순자 작가님'의 신규 민들레 사진 시집이 승인되어 1인 회고관에 게시되었습니다! — 작품 승인 알림 예시</span>
+            <span>⛵ [중구 평생학습관] '상상의 바다 갤러리' 가상 VR 전시관의 방문객이 300명을 돌파했습니다! — 전시관 방문 알림 예시</span>
+            <span>💡 [금정구 노인복지관] '최말순 어르신'이 굿즈 디자인 도안 컵 제작을 완료 신청하셨습니다. — 굿즈 신청 알림 예시</span>
           </div>
         </div>
       </div>
@@ -1950,7 +2024,7 @@
       <!-- ============================================== -->
       <div id="view-coach" class="app-view">
         <div class="view-title-bar">
-          <h2>온하다 AI 코치</h2>
+          <h2>온하다 AI 코치 <span style="font-size:1.15rem; color:#bfa3ff; font-weight:700; border: 1px solid rgba(191,163,255,0.4); padding: 3px 12px; border-radius:20px; margin-left:12px; vertical-align:middle; display:inline-block;">기능 시연용 프로토타입</span></h2>
           <p>한 단계씩 큰 글자를 읽고 따라하며 시와 그림, 동화책, 편지를 손쉽게 만듭니다.</p>
         </div>
 
@@ -2202,7 +2276,7 @@
             </div>
 
             <div class="coach-bubble" style="padding: 25px; border-radius: 20px; font-size: 1.15rem; line-height: 1.8; color: #fff;">
-              <p id="coach-speech">안녕하세요! 작가님만의 소중한 사진, 감정, 인생 스토리를 골라 입력하신 후 버튼을 클릭하시면 즉석에서 아름다운 예술 시나 AI 작품을 빚어 드립니다.</p>
+              <p id="coach-speech">안녕하세요! 작가님만의 소중한 사진, 감정, 인생 스토리를 골라 입력하시면 AI 창작 과정을 단계별로 체험할 수 있습니다. (기능 시연용 프로토타입)</p>
             </div>
 
             <div class="coach-loading" id="coach-spinner" style="margin-top: 25px;">
@@ -2240,11 +2314,11 @@
       <div id="view-apply" class="app-view">
         <div class="view-title-bar">
           <h2>기관 전시관 개설 및 성과 리포트 (B2B Sandbox)</h2>
-          <p>전국의 노인복지관, 평생학습원 실무자를 위한 3초 초간편 실시간 전시관 생성 개설 공간입니다.</p>
+          <p>전국의 노인복지관, 평생학습원 실무자를 위한 전시관 개설 및 관리 시뮬레이터 공간입니다.</p>
         </div>
 
         <div class="coach-control-panel" style="max-width: 750px; margin: 0 auto; padding: 40px; border-radius: 30px;">
-          <h3 style="color:#fff; font-size: 1.5rem; font-weight:900; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px; margin-bottom: 25px;">🏢 실시간 우리 복지관 전시관 개설하기</h3>
+          <h3 style="color:#fff; font-size: 1.5rem; font-weight:900; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px; margin-bottom: 25px;">🏢 우리 복지관 전시관 개설 시뮬레이션</h3>
           
           <div class="form-group" style="margin-bottom: 25px;">
             <label class="form-label" style="font-size: 1.2rem; font-weight: 800;">1. 우리 복지기관/지자체 단체명</label>
@@ -2270,7 +2344,7 @@
             </select>
           </div>
 
-          <button class="btn-run-coach" onclick="submitPlatformApply()" style="margin-top:25px; width: 100%;">🏢 실시간 전시관 개설 및 성과 리포트 출력</button>
+          <button class="btn-run-coach" onclick="submitPlatformApply()" style="margin-top:25px; width: 100%;">🏢 시범 전시관 개설 및 성과 리포트 출력</button>
         </div>
       </div>
 
@@ -2447,7 +2521,7 @@
           <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 25px; border-radius: 20px;">
             <h4 style="color:#fff; margin-bottom:15px;">실증 사업 정량 분석보고서 인쇄 및 내보내기</h4>
             <p style="color:var(--text-gray); font-size:0.9rem; line-height:1.6; margin-bottom:20px;">
-              관람자의 실시간 반응(하트, 댓글 등) 데이터 분석을 기반으로 실증 기간 동안 고령층의 우울감 완화 및 디지털 참여도 변화 지표를 한눈에 증명용 리포트로 내보냅니다.
+              관람자의 반응(하트, 댓글 등) 데이터 분석을 기반으로 실증 기간 동안 고령층의 우울감 완화 및 디지털 참여도 변화 지표를 한눈에 보고서로 내보냅니다. (B2B 예시 리포트)
             </p>
             <button class="btn-hero-primary" onclick="printMockReport()">📊 성과 보고서 PDF 저장/출력</button>
           </div>
@@ -3085,14 +3159,24 @@
           btnText = "전시관 입장하기 &rarr;";
         }
 
+        let badgeHtml = "";
+        if (hall.id === "art" || hall.id === "museum") {
+          badgeHtml = `<span class="hall-status-badge live" style="background: rgba(46, 204, 113, 0.15); border: 1px solid #2ecc71; color: #2ecc71; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;">현재 운영 중</span>`;
+        } else {
+          badgeHtml = `<span class="hall-status-badge demo" style="background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;">데모 전시관</span>`;
+        }
+
         container.innerHTML += `
           <div class="hall-card">
             <div class="hall-img-box" onclick="enterSpecificHall('${hall.id}')">
               <img src="${hall.img}" alt="${hall.title}">
             </div>
             <div class="hall-info-box">
-              <div class="hall-badge-row">
-                <span class="hall-type-tag">${hall.tag}</span>
+              <div class="hall-badge-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="hall-type-tag" style="margin-bottom:0;">${hall.tag}</span>
+                  ${badgeHtml}
+                </div>
                 <span style="font-size:0.8rem; color:#aaa; font-weight:600;">${hall.center}</span>
               </div>
               <h4 onclick="enterSpecificHall('${hall.id}')">${hall.title}</h4>
