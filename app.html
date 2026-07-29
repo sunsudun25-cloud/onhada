@@ -1563,6 +1563,124 @@
     .coach-wizard-step {
       animation: fadeIn 0.4s ease;
     }
+
+    /* 포털 대시보드 및 네트워크 진입로 기본 그리드 */
+    .eco-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .role-portals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* --- 모바일 반응형 스타일 고도화 --- */
+    @media (max-width: 768px) {
+      /* 1. 인트로 포털 조정 */
+      .intro-ui h1 {
+        font-size: 3rem !important;
+        letter-spacing: 5px !important;
+        margin-bottom: 5px !important;
+      }
+      .slogan-single {
+        font-size: 0.95rem !important;
+        letter-spacing: 1px !important;
+        padding: 0 10px;
+      }
+      
+      /* 2. 네비게이션 헤더 반응형 */
+      .header-container {
+        flex-direction: column;
+        gap: 12px;
+        padding: 0 15px;
+        align-items: stretch;
+      }
+      .nav-links {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 6px;
+        gap: 20px;
+        scrollbar-width: none; /* Firefox */
+      }
+      .nav-links::-webkit-scrollbar {
+        display: none; /* Chrome, Safari */
+      }
+      .nav-item-btn {
+        flex-shrink: 0;
+        font-size: 0.9rem !important;
+      }
+      .header-container > div:last-child {
+        width: 100%;
+        justify-content: space-between !important;
+      }
+      #role-badge-container {
+        width: 100%;
+        justify-content: center;
+      }
+
+      /* 3. 공통 레이아웃 및 뷰 조정 */
+      .app-main-content {
+        padding: 25px 15px !important;
+      }
+      .view-title-bar h2 {
+        font-size: 1.7rem !important;
+      }
+      .view-title-bar p {
+        font-size: 0.9rem !important;
+      }
+
+      /* 4. 대시보드 그리드 조정 */
+      .eco-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      .role-portals-grid {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* 5. 코치(AI 창작 엔진) 레이아웃 */
+      .coach-split-container {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+      }
+
+      /* 6. 굿즈 주문 레이아웃 */
+      .goods-split-layout {
+        grid-template-columns: 1fr !important;
+        gap: 25px !important;
+      }
+      .goods-preview-box {
+        position: static !important;
+      }
+
+      /* 7. 작품 상세 모달창 모바일 최적화 */
+      .modal-box {
+        grid-template-columns: 1fr !important;
+        height: 90vh !important;
+        overflow-y: auto !important;
+        width: 95% !important;
+      }
+      .modal-media-side {
+        height: 280px !important;
+      }
+      .modal-content-side {
+        padding: 25px !important;
+        height: auto !important;
+        overflow-y: visible !important;
+      }
+      .btn-close-modal {
+        top: 15px !important;
+        right: 15px !important;
+        background: rgba(0, 0, 0, 0.6) !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .eco-stats-grid {
+        grid-template-columns: 1fr !important;
+      }
+    }
 </style>
 </head>
 <body>
@@ -1667,7 +1785,7 @@
         <!-- 2. 실시간 플랫폼 에코시스템 상태판 (Live Metrics Dashboard) -->
         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 30px; padding: 35px 50px; margin-bottom: 50px; text-align: center;">
           <h3 style="font-size: 1.5rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">📈 실시간 플랫폼 생태계 연동 보드</h3>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+          <div class="eco-stats-grid" style="gap: 20px;">
             <!-- 메트릭 1 -->
             <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 25px 15px;">
               <span style="font-size: 2.3rem; font-weight: 900; color: var(--accent-color); display: block; margin-bottom: 8px;" id="count-centers">12</span>
@@ -1693,7 +1811,7 @@
 
         <!-- 3. 역할별 다자간 진입로 (Role-Based Action Portals) -->
         <h3 style="font-size: 1.6rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">👥 다자간 플랫폼 네트워크 진입로</h3>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 60px;">
+        <div class="role-portals-grid" style="gap: 30px; margin-bottom: 60px;">
           
           <!-- 카드 1: 일반 관람객 -->
           <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 30px; padding: 40px 30px; display: flex; flex-direction: column; height: 100%;">
