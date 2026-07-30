@@ -1873,6 +1873,105 @@
       background: rgba(255, 255, 255, 0.02);
     }
 
+
+    /* --- FEATURED ARTWORK PREVIEW STYLES --- */
+    .featured-art-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 25px;
+      margin-bottom: 50px;
+    }
+    @media (max-width: 768px) {
+      .featured-art-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .art-card {
+      background: rgba(255, 255, 255, 0.03) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      border-radius: 20px !important;
+      overflow: hidden;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+    }
+    .art-card:hover {
+      border-color: #FFD700 !important;
+      transform: translateY(-8px) scale(1.01) !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(255, 215, 0, 0.15) !important;
+    }
+    .art-img-box {
+      width: 100%;
+      height: 180px;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+    }
+    .art-img-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s;
+    }
+    .art-card:hover .art-img-box img {
+      transform: scale(1.06);
+    }
+    .art-badge {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      color: #FFD700;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .art-info {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+    .art-meta {
+      font-size: 0.78rem;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .art-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .art-desc {
+      font-size: 0.85rem;
+      color: #aaa;
+      line-height: 1.6;
+      margin-bottom: 15px;
+      flex-grow: 1;
+      font-style: italic;
+    }
+    .art-btn-preview {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 8px 15px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border-radius: 50px;
+      transition: 0.3s;
+      width: fit-content;
+    }
+    .art-card:hover .art-btn-preview {
+      background: rgba(255, 215, 0, 0.15);
+      border-color: rgba(255, 215, 0, 0.4);
+      color: #FFD700;
+    }
+
 </style>
 </head>
 <body>
@@ -1981,7 +2080,56 @@
         </div>
 
         <!-- 2. 플랫폼 운영 상태판 (실제 실증 vs 확장 예시) -->
-        <h3 class="reveal" style="font-size: 1.6rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">👥 참여 공간</h3>
+        
+        <!-- [신규] 실시간 추천 작품 (전시관 프리뷰) -->
+        <h3 class="reveal" style="font-size: 1.6rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">🎨 오늘의 추천 대표 작품</h3>
+        <div class="featured-art-grid reveal">
+          
+          <!-- 작품 1: 민들레 -->
+          <div class="art-card" onclick="switchView('browse')">
+            <div class="art-img-box">
+              <span class="art-badge">인기 디카시</span>
+              <img src="민들레_김순자.jpg" alt="민들레">
+            </div>
+            <div class="art-info">
+              <span class="art-meta">김순자 작가님 (78세 · 동래구 노인복지관)</span>
+              <h4 class="art-title">민들레</h4>
+              <p class="art-desc">"밟혀도 밟혀도 노랗게 피어나는 봄날의 따스한 미소처럼, 꿋꿋한 내 인생길 닮았구나."</p>
+              <span class="art-btn-preview">전시관에서 감상 ON ➔</span>
+            </div>
+          </div>
+
+          <!-- 작품 2: 온아트상세 -->
+          <div class="art-card" onclick="switchView('browse')">
+            <div class="art-img-box">
+              <span class="art-badge">AI 드로잉</span>
+              <img src="온아트상세.png" alt="꿈꾸는 고향">
+            </div>
+            <div class="art-info">
+              <span class="art-meta">박창수 작가님 (75세 · 은평구 도서관)</span>
+              <h4 class="art-title">꿈꾸는 고향</h4>
+              <p class="art-desc">"그 시절 뛰놀던 고향 골목길과 붉게 타오르던 서녘 노을을 기억 속 따뜻한 빛깔로 빚어내다."</p>
+              <span class="art-btn-preview">전시관에서 감상 ON ➔</span>
+            </div>
+          </div>
+
+          <!-- 작품 3: 온뮤지엄 상세 -->
+          <div class="art-card" onclick="switchView('browse')">
+            <div class="art-img-box">
+              <span class="art-badge">AI 사운드</span>
+              <img src="온뮤지엄 상세.png" alt="황혼의 노래">
+            </div>
+            <div class="art-info">
+              <span class="art-meta">이영희 작가님 (81세 · 중구 평생학습원)</span>
+              <h4 class="art-title">황혼의 멜로디</h4>
+              <p class="art-desc">"서정적인 시에 멜로디를 얹어, 황혼의 길목에서 바라본 삶의 깊은 여운을 노래하다."</p>
+              <span class="art-btn-preview">전시관에서 감상 ON ➔</span>
+            </div>
+          </div>
+
+        </div>
+
+<h3 class="reveal" style="font-size: 1.6rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">👥 참여 공간</h3>
         <div class="role-portals-grid reveal" style="gap: 30px; margin-bottom: 60px;">
           
           <!-- 카드 1: 일반 관람객 -->
