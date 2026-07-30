@@ -1755,6 +1755,124 @@
         display: inline !important;
       }
     }
+
+    /* --- SCROLL REVEAL & LIVE TICKER OVERRIDES --- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* 프리미엄 카드화 및 호버 스타일 통일 */
+    .role-portals-grid > div {
+      background: #151827 !important;
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35) !important;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    .role-portals-grid > div:hover {
+      border-color: #FFD700 !important;
+      transform: translateY(-8px) scale(1.01) !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(255, 215, 0, 0.15) !important;
+    }
+
+    .live-ticker-card {
+      background: rgba(0, 0, 0, 0.45) !important;
+      border: 1px solid rgba(255, 215, 0, 0.2) !important;
+      border-radius: 24px !important;
+      padding: 18px 25px !important;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+      transform: translateY(0) !important;
+    }
+    .live-ticker-card:hover {
+      border-color: #FFD700 !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.1) !important;
+    }
+    .live-badge-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 15px;
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+      flex-shrink: 0;
+    }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #2ecc71;
+      border-radius: 50%;
+      display: inline-block;
+      animation: blink 1.5s infinite;
+    }
+    @keyframes blink {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+    .live-text {
+      color: #2ecc71;
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+    .ticker-wrapper {
+      flex-grow: 1;
+      height: 24px;
+      overflow: hidden;
+      position: relative;
+    }
+    .ticker-list {
+      position: absolute;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ticker-item {
+      height: 24px;
+      line-height: 24px;
+      font-size: 0.9rem;
+      color: #D6D8E0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+    .ticker-tag {
+      background: rgba(255, 215, 0, 0.1);
+      color: #FFD700;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 10px;
+    }
+    .simulation-label {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 0.75rem;
+      margin-left: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2px 10px;
+      border-radius: 50px;
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
 </style>
 </head>
 <body>
@@ -1863,7 +1981,7 @@
         </div>
 
         <!-- 2. 플랫폼 운영 상태판 (실제 실증 vs 확장 예시) -->
-        <div class="stats-split-grid">
+        <div class="stats-split-grid reveal">
           
           <!-- 실제 실증 현황 -->
           <div style="background: rgba(46, 204, 113, 0.03); border: 1.5px solid rgba(46, 204, 113, 0.25); border-radius: 30px; padding: 35px 30px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
@@ -1923,8 +2041,8 @@
         </div>
 
         <!-- 3. 역할별 다자간 진입로 (Role-Based Action Portals) -->
-        <h3 style="font-size: 1.6rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">👥 다자간 플랫폼 네트워크 진입로</h3>
-        <div class="role-portals-grid" style="gap: 30px; margin-bottom: 60px;">
+        <h3 class="reveal" style="font-size: 1.6rem; color: #fff; margin-bottom: 25px; font-weight: 900; letter-spacing: -0.5px;">👥 다자간 플랫폼 네트워크 진입로</h3>
+        <div class="role-portals-grid reveal" style="gap: 30px; margin-bottom: 60px;">
           
           <!-- 카드 1: 일반 관람객 -->
           <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 30px; padding: 40px 30px; display: flex; flex-direction: column; height: 100%;">
@@ -1958,17 +2076,22 @@
 
         </div>
 
-        <!-- 4. 실시간 동향 피드 Ticker (Live Feeds Ticker) -->
-        <div class="ticker-container" style="border-left: 5px solid var(--accent-color); gap: 20px;">
-          <span class="ticker-label" style="color: var(--accent-color); flex-shrink: 0;">
-            <span class="desktop-only-inline">📢 플랫폼 운영 시나리오 예시:</span>
-            <span class="mobile-only-inline" style="display:none;">📢 시나리오 예시:</span>
-          </span>
-          <div class="ticker-content" style="gap: 50px; color: #ddd;">
-            <span>🌸 [동래구 노인복지관] '김순자 작가님'의 신규 민들레 사진 시집이 승인되어 1인 회고관에 게시되었습니다! — 작품 승인 알림 예시</span>
-            <span>⛵ [중구 평생학습관] '상상의 바다 갤러리' 가상 VR 전시관의 방문객이 300명을 돌파했습니다! — 전시관 방문 알림 예시</span>
-            <span>💡 [금정구 노인복지관] '최말순 어르신'이 굿즈 디자인 도안 컵 제작을 완료 신청하셨습니다. — 굿즈 신청 알림 예시</span>
+        <!-- 4. 실시간 동향 티커 (데모 시뮬레이션 예시) -->
+        <div class="live-ticker-card reveal" style="margin-top: 20px; margin-bottom: 30px;">
+          <div class="live-badge-wrapper">
+            <span class="live-dot"></span>
+            <span class="live-text">LIVE</span>
           </div>
+          <div class="ticker-wrapper">
+            <ul class="ticker-list" id="appLiveTickerList">
+              <li class="ticker-item"><span class="ticker-tag">신규 등록</span>부산 동래구 복지관 - 김순자 작가님의 '민들레' 시구가 등록되었습니다 (방금 전)</li>
+              <li class="ticker-item"><span class="ticker-tag">전시장 동향</span>'상상의 바다 갤러리'에 관람객 응원 메시지가 도착했습니다 (2분 전)</li>
+              <li class="ticker-item"><span class="ticker-tag">신규 등록</span>서울 은평구 도서관 - 박창수 작가님의 AI 드로잉 '고향 하늘'이 승인되었습니다 (5분 전)</li>
+              <li class="ticker-item"><span class="ticker-tag">따뜻한 연결</span>'빛의 사운드 뮤지엄'의 감상하기 누적 횟수가 120회를 돌파했습니다 (10분 전)</li>
+              <li class="ticker-item"><span class="ticker-tag">신규 개설</span>대전 유성구 평생학습원 - '인생 한 페이지' 1인 회고전 전시관이 오픈되었습니다 (20분 전)</li>
+            </ul>
+          </div>
+          <span class="simulation-label">데모 시뮬레이션 예시</span>
         </div>
       </div>
 
@@ -4212,6 +4335,70 @@
       
       switchView(viewName);
     }
+
+    // Scroll Reveal Animation (Intersection Observer) for app.html
+    document.addEventListener("DOMContentLoaded", () => {
+      const initScrollReveal = () => {
+        const reveals = document.querySelectorAll(".reveal");
+        const observerOptions = {
+          root: null,
+          rootMargin: "0px",
+          threshold: 0.1
+        };
+        
+        const observer = new IntersectionObserver((entries, observer) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("active");
+              observer.unobserve(entry.target);
+            }
+          });
+        }, observerOptions);
+        
+        reveals.forEach(element => {
+          // Remove active class first so it animates when switching views if needed
+          element.classList.remove("active");
+          observer.observe(element);
+        });
+      };
+      
+      initScrollReveal();
+      
+      // Re-initialize animations when tab view changes
+      const originalSwitchView = window.switchView;
+      if (originalSwitchView) {
+        window.switchView = function(viewName) {
+          originalSwitchView(viewName);
+          // Small timeout to allow element rendering/display changes
+          setTimeout(() => {
+            const activeView = document.querySelector(".app-view.active");
+            if (activeView) {
+              const reveals = activeView.querySelectorAll(".reveal");
+              reveals.forEach(el => el.classList.add("active")); // force active on active view elements
+            }
+          }, 50);
+        };
+      }
+    });
+
+    // App Live Activity Ticker Rolling
+    document.addEventListener("DOMContentLoaded", () => {
+      const tickerList = document.getElementById("appLiveTickerList");
+      if (!tickerList) return;
+      
+      const items = tickerList.getElementsByTagName("li");
+      const itemCount = items.length;
+      if (itemCount <= 1) return;
+      
+      let currentIndex = 0;
+      
+      setInterval(() => {
+        currentIndex = (currentIndex + 1) % itemCount;
+        const yOffset = -currentIndex * 24; // 24px height per item
+        tickerList.style.transform = `translateY(${yOffset}px)`;
+      }, 3500); // roll every 3.5 seconds
+    });
+
 </script>
 
   <!-- 외부 전시관 연동 풀스크린 모달 -->
