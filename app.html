@@ -3038,17 +3038,18 @@
     </div>
   </div>
 
-  <!-- 관리자 패스코딩 모달 -->
+  <!-- 관리자 로그인 모달 -->
   <div class="admin-login-overlay" id="admin-login-modal">
     <div class="admin-login-box">
       <h3 style="font-size: 1.4rem; color: #fff; margin-bottom: 10px;">관리자 전용 제어 로그인</h3>
-      <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px;">보안 패스코드를 입력하세요.</p>
-      
-      <input type="password" id="admin-passcode" class="form-control" placeholder="비밀번호 입력 (연습용: 1234)" style="text-align: center; font-size: 1.2rem; letter-spacing: 5px; margin-bottom: 25px;">
-      
+      <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px;">관리자 이메일과 비밀번호를 입력하세요.</p>
+
+      <input type="email" id="admin-email" class="form-control" placeholder="관리자 이메일" autocomplete="username" style="text-align: center; font-size: 1rem; margin-bottom: 15px;">
+      <input type="password" id="admin-passcode" class="form-control" placeholder="비밀번호" autocomplete="current-password" style="text-align: center; font-size: 1.2rem; letter-spacing: 5px; margin-bottom: 25px;">
+
       <div style="display: flex; gap: 10px;">
         <button class="btn-hero-secondary" onclick="closeAdminLogin()" style="flex: 1;">취소</button>
-        <button class="btn-hero-primary" onclick="verifyAdminPass()" style="flex: 1;">인증 완료</button>
+        <button class="btn-hero-primary" id="admin-login-submit" onclick="verifyAdminPass()" style="flex: 1;">인증 완료</button>
       </div>
     </div>
   </div>
@@ -4058,7 +4059,7 @@
     }
 
     // ==============================================
-    // [6] 기관 관리자 기능 제어 (Passcode 1234)
+    // [6] 기관 관리자 기능 제어 (Supabase Auth 연동)
     // ==============================================
     let isAdminAuthenticated = false;
 
@@ -4066,6 +4067,8 @@
       if (isAdminAuthenticated) {
         switchView('admin');
       } else {
+        const passEl = document.getElementById('admin-passcode');
+        if (passEl) passEl.value = "";
         document.getElementById('admin-login-modal').style.display = 'flex';
       }
     }
@@ -4075,22 +4078,71 @@
       document.getElementById('admin-passcode').value = "";
     }
 
-    function verifyAdminPass() {
-      const val = document.getElementById('admin-passcode').value;
-      if (val === "1234") {
-        isAdminAuthenticated = true;
-        closeAdminLogin();
-        switchView('admin');
-      } else {
-        alert("비밀번호가 틀렸습니다. (연습용: 1234)");
+    async function verifyAdminPass() {
+      const emailEl = document.getElementById('admin-email');
+      const passEl = document.getElementById('admin-passcode');
+      const submitBtn = document.getElementById('admin-login-submit');
+
+      const email = emailEl ? emailEl.value.trim() : "";
+      const password = passEl ? passEl.value : "";
+
+      if (!email || !password) {
+        alert("관리자 이메일과 비밀번호를 모두 입력해 주세요.");
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const result = await window.ONHADA_BACKEND.auth.signIn(email, password);
+
+        if (result.success && result.profile && result.profile.role === 'admin') {
+          isAdminAuthenticated = true;
+          if (passEl) passEl.value = "";
+          closeAdminLogin();
+          switchView('admin');
+          return;
+        }
+
+        if (result.success && result.profile && result.profile.role === 'manager') {
+          await window.ONHADA_BACKEND.auth.signOut();
+          isAdminAuthenticated = false;
+          if (passEl) passEl.value = "";
+          alert("관리자 계정만 접근할 수 있습니다.");
+          return;
+        }
+
+        isAdminAuthenticated = false;
+        if (passEl) passEl.value = "";
+        alert((result.error && result.error.message) || "로그인에 실패했습니다.");
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
     }
 
-    function logoutAdmin() {
-      isAdminAuthenticated = false;
-      switchView('browse');
+    async function logoutAdmin() {
+      try {
+        await window.ONHADA_BACKEND.auth.signOut();
+      } finally {
+        isAdminAuthenticated = false;
+        const passEl = document.getElementById('admin-passcode');
+        if (passEl) passEl.value = "";
+        switchView('browse');
+      }
       showAlertDialog("로그아웃 완료", "기관 권한 세션이 안전하게 자동 파기되었습니다.", "🔒");
     }
+
+    // 새로고침 시 기존 admin 세션 복원 (admin 역할일 때만, 화면 자동 이동은 하지 않음)
+    window.addEventListener('load', async () => {
+      try {
+        const context = await window.ONHADA_BACKEND.auth.getCurrentUserContext();
+        if (context && context.signedIn && context.profile && context.profile.role === 'admin') {
+          isAdminAuthenticated = true;
+        }
+      } catch (err) {
+        // 세션 확인 실패는 기존 페이지 로딩에 영향을 주지 않는다.
+      }
+    });
 
     // 승인 대기 리스트
     function renderAdminTable() {
