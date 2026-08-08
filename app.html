@@ -3182,10 +3182,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-8"></script>
-  <script src="js/auth-service.js?v=20260808-8"></script>
-  <script src="js/db-service.js?v=20260808-8"></script>
-  <script src="js/storage-service.js?v=20260808-8"></script>
+  <script src="js/supabase-client.js?v=20260808-9"></script>
+  <script src="js/auth-service.js?v=20260808-9"></script>
+  <script src="js/db-service.js?v=20260808-9"></script>
+  <script src="js/storage-service.js?v=20260808-9"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -3501,15 +3501,90 @@
       renderGoodsOrderSelect();
     }
 
+    // 로컬 id 체계(INITIAL_HALLS)와 CSS class 등에 안전하게 쓸 수 있는
+    // 문자열인지 검사한다 - legacy_id가 있어도 이 형식을 통과하지 못하면
+    // 신규 카드의 id로 그대로 쓰지 않는다.
+    function onhadaIsSafeHallId(value) {
+      return typeof value === 'string' && /^[a-zA-Z0-9_-]+$/.test(value);
+    }
+
+    // platformHalls/INITIAL_HALLS는 절대 변경하지 않는다. 매 호출마다 얕은
+    // 복사본 배열을 새로 만들어 renderBrowseHalls()에만 전달한다.
+    //   - Supabase 전시관의 legacy_id가 기존 로컬 hall.id와 같으면: 로컬 카드
+    //     1개만 유지하고 title/center/tag/img/externalUrl은 절대 덮어쓰지
+    //     않는다. exhibition_stats의 유효한(유한수이고 0보다 큰) 값만
+    //     count/authors를 보완하는 데 쓴다.
+    //   - legacy_id가 없거나 매칭되는 로컬 항목이 없으면 신규 내부 Supabase
+    //     전시관으로 별도 추가한다.
+    function onhadaGetMergedBrowseHalls() {
+      const merged = platformHalls.map(hall => Object.assign({}, hall));
+
+      onhadaPublicExhibitions.forEach(ex => {
+        const statsRow = Array.isArray(ex.exhibition_stats) ? ex.exhibition_stats[0] : ex.exhibition_stats;
+        const validArtworkCount = (statsRow && Number.isFinite(statsRow.artwork_count) && statsRow.artwork_count > 0) ? statsRow.artwork_count : null;
+        const validParticipantCount = (statsRow && Number.isFinite(statsRow.participant_count) && statsRow.participant_count > 0) ? statsRow.participant_count : null;
+
+        if (ex.legacy_id) {
+          const matchIndex = merged.findIndex(hall => hall.id === ex.legacy_id);
+          if (matchIndex !== -1) {
+            if (validArtworkCount !== null) merged[matchIndex].count = validArtworkCount;
+            if (validParticipantCount !== null) merged[matchIndex].authors = validParticipantCount;
+            return;
+          }
+        }
+
+        const safeId = (ex.legacy_id && onhadaIsSafeHallId(ex.legacy_id)) ? ex.legacy_id : ('supabase-' + ex.id);
+
+        merged.push({
+          id: safeId,
+          source: 'supabase',
+          supabaseExhibitionId: ex.id,
+          title: ex.title || '',
+          center: ex.organization_name || '',
+          tag: ex.tag || '',
+          img: ex.cover_image_path || '',
+          count: validArtworkCount || 0,
+          authors: validParticipantCount || 0,
+          isRecomm: false,
+          isRecent: false,
+          isPersonal: false
+        });
+      });
+
+      return merged;
+    }
+
+    // 페이지 로드 후 1회 호출된다. 실패해도 기존 platformHalls만 정상
+    // 표시되어야 하므로 예외를 밖으로 던지지 않는다.
+    async function onhadaLoadPublicExhibitions() {
+      onhadaPublicExhibitionsRequestSeq += 1;
+      const requestSeq = onhadaPublicExhibitionsRequestSeq;
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getPublicExhibitions();
+      } catch (err) {
+        result = { ok: false, exhibitions: [], error: null };
+      }
+
+      // stale 가드: 응답이 오는 사이 새 요청이 시작됐으면 이 결과는 버린다.
+      if (requestSeq !== onhadaPublicExhibitionsRequestSeq) return;
+
+      onhadaPublicExhibitions = (result && result.ok && Array.isArray(result.exhibitions)) ? result.exhibitions : [];
+
+      const searchInputEl = document.getElementById('gallerySearchInput');
+      renderBrowseHalls(searchInputEl ? searchInputEl.value : "");
+    }
+
     // [전시관 둘러보기] 카드 6개 이상 동적 로딩 및 필터링
     function renderBrowseHalls(searchQuery = "") {
       const container = document.getElementById('browse-halls-grid-container');
       if (!container) return;
 
       container.innerHTML = "";
-      
+
       // 검색 및 탭 카테고리 필터링 적용
-      const filtered = platformHalls.filter(hall => {
+      const filtered = onhadaGetMergedBrowseHalls().filter(hall => {
         // 카테고리 필터
         if (selectedBrowseCategory === 'recomm') {
           if (!hall.isRecomm) return false;
@@ -3536,6 +3611,81 @@
       }
 
       filtered.forEach(hall => {
+        // 신규 내부 Supabase 전시관 카드 - 이번 단계에서는 작품 조회/상세
+        // 화면 연결을 하지 않으므로 클릭 핸들러를 붙이지 않는다. DB 문자열은
+        // createElement/textContent로만 넣는다(innerHTML 금지).
+        if (hall.source === 'supabase') {
+          const card = document.createElement('div');
+          card.className = 'hall-card';
+
+          const imgBox = document.createElement('div');
+          imgBox.className = 'hall-img-box';
+          const img = document.createElement('img');
+          img.src = hall.img;
+          img.alt = hall.title;
+          imgBox.appendChild(img);
+          card.appendChild(imgBox);
+
+          const infoBox = document.createElement('div');
+          infoBox.className = 'hall-info-box';
+
+          const badgeRow = document.createElement('div');
+          badgeRow.className = 'hall-badge-row';
+          badgeRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;";
+
+          const leftGroup = document.createElement('div');
+          leftGroup.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+          const tagSpan = document.createElement('span');
+          tagSpan.className = 'hall-type-tag';
+          tagSpan.style.marginBottom = '0';
+          tagSpan.textContent = hall.tag;
+          leftGroup.appendChild(tagSpan);
+
+          const statusBadge = document.createElement('span');
+          statusBadge.className = 'hall-status-badge demo';
+          statusBadge.style.cssText = "background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;";
+          statusBadge.textContent = "신규 준비 전시관";
+          leftGroup.appendChild(statusBadge);
+
+          badgeRow.appendChild(leftGroup);
+
+          const centerSpan = document.createElement('span');
+          centerSpan.style.cssText = "font-size:0.8rem; color:#aaa; font-weight:600;";
+          centerSpan.textContent = hall.center;
+          badgeRow.appendChild(centerSpan);
+
+          infoBox.appendChild(badgeRow);
+
+          const titleEl = document.createElement('h4');
+          titleEl.textContent = hall.title;
+          infoBox.appendChild(titleEl);
+
+          const metaInfo = document.createElement('div');
+          metaInfo.className = 'hall-meta-info';
+          metaInfo.style.cssText = "border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;";
+
+          const authorsSpan = document.createElement('span');
+          authorsSpan.textContent = '참여 작가 ' + hall.authors + '명';
+          metaInfo.appendChild(authorsSpan);
+
+          const countSpan = document.createElement('span');
+          countSpan.textContent = '등록 작품 ' + hall.count + '점';
+          metaInfo.appendChild(countSpan);
+
+          infoBox.appendChild(metaInfo);
+          card.appendChild(infoBox);
+
+          container.appendChild(card);
+          return;
+        }
+
+        // --- 이하 기존 로컬 카드(외부 Lovable 전시관 4개 포함) 렌더링 -
+        // 템플릿 내용은 기존과 동일하게 유지한다. 다만 Supabase 카드와
+        // 안전하게 섞어 넣기 위해 container.innerHTML += 대신, 별도 wrapper에
+        // 한 번만 innerHTML을 설정한 뒤 그 요소를 appendChild한다
+        // (container.innerHTML +=는 매 반복마다 전체를 재파싱해 이미 넣은
+        // Supabase 카드의 addEventListener를 날려버릴 수 있어 사용하지 않는다).
         // 1인 개인관과 기관/주제관 메타데이터 레이아웃 및 버튼 텍스트 분기 처리
         let metaHtml = "";
         let btnText = "";
@@ -3564,7 +3714,8 @@
           badgeHtml = `<span class="hall-status-badge demo" style="background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;">데모 전시관</span>`;
         }
 
-        container.innerHTML += `
+        const localCardWrapper = document.createElement('div');
+        localCardWrapper.innerHTML = `
           <div class="hall-card">
             <div class="hall-img-box" onclick="enterSpecificHall('${hall.id}')">
               <img src="${hall.img}" alt="${hall.title}">
@@ -3584,6 +3735,7 @@
             </div>
           </div>
         `;
+        container.appendChild(localCardWrapper.firstElementChild);
       });
     }
 
@@ -4190,6 +4342,8 @@
     let onhadaManagerImageCategoriesPopulated = false;
     let onhadaCloudPreviewUrls = new Map();
     let onhadaCloudPreviewCompleted = new Set();
+    let onhadaPublicExhibitions = [];
+    let onhadaPublicExhibitionsRequestSeq = 0;
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
@@ -4937,6 +5091,12 @@
       } catch (err) {
         // 세션 확인 실패는 기존 페이지 로딩에 영향을 주지 않는다.
       }
+    });
+
+    // 공개 Supabase 전시관 목록을 1회 조회한다. 실패해도 기존 platformHalls만
+    // 정상 표시되어야 하므로 여기서 잡은 예외를 밖으로 던지지 않는다.
+    window.addEventListener('load', () => {
+      onhadaLoadPublicExhibitions();
     });
 
     // 승인 대기 리스트
