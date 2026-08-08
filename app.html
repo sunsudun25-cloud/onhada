@@ -3182,10 +3182,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-9"></script>
-  <script src="js/auth-service.js?v=20260808-9"></script>
-  <script src="js/db-service.js?v=20260808-9"></script>
-  <script src="js/storage-service.js?v=20260808-9"></script>
+  <script src="js/supabase-client.js?v=20260808-10"></script>
+  <script src="js/auth-service.js?v=20260808-10"></script>
+  <script src="js/db-service.js?v=20260808-10"></script>
+  <script src="js/storage-service.js?v=20260808-10"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -3624,6 +3624,7 @@
           img.src = hall.img;
           img.alt = hall.title;
           imgBox.appendChild(img);
+          imgBox.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
           card.appendChild(imgBox);
 
           const infoBox = document.createElement('div');
@@ -3645,7 +3646,7 @@
           const statusBadge = document.createElement('span');
           statusBadge.className = 'hall-status-badge demo';
           statusBadge.style.cssText = "background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;";
-          statusBadge.textContent = "신규 준비 전시관";
+          statusBadge.textContent = "전시 관람 가능";
           leftGroup.appendChild(statusBadge);
 
           badgeRow.appendChild(leftGroup);
@@ -3659,6 +3660,7 @@
 
           const titleEl = document.createElement('h4');
           titleEl.textContent = hall.title;
+          titleEl.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
           infoBox.appendChild(titleEl);
 
           const metaInfo = document.createElement('div');
@@ -3674,6 +3676,18 @@
           metaInfo.appendChild(countSpan);
 
           infoBox.appendChild(metaInfo);
+
+          // 신규 Supabase 전시관은 실제 UUID(hall.supabaseExhibitionId)를
+          // enterSupabaseExhibition()에 전달한다. 기존 enterSpecificHall(id)와
+          // 완전히 분리된 경로이며, DB 문자열을 onclick 문자열에 직접
+          // 삽입하지 않고 addEventListener 클로저로만 전달한다.
+          const enterBtn = document.createElement('button');
+          enterBtn.className = 'btn-enter-hall';
+          enterBtn.style.width = '100%';
+          enterBtn.textContent = '전시관 입장하기 →';
+          enterBtn.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
+          infoBox.appendChild(enterBtn);
+
           card.appendChild(infoBox);
 
           container.appendChild(card);
@@ -3823,6 +3837,202 @@
       });
     }
 
+    // 공개 관람 화면 전용 blob object URL 정리. 관리자 미리보기용
+    // onhadaCloudPreviewUrls Map과는 완전히 분리된 별도 Map만 다룬다.
+    function onhadaRevokePublicArtworkBlobUrls() {
+      onhadaPublicArtworkBlobUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+      });
+      onhadaPublicArtworkBlobUrls.clear();
+    }
+
+    window.addEventListener('beforeunload', function () {
+      onhadaRevokePublicArtworkBlobUrls();
+    });
+
+    // 신규 내부 Supabase 전시관 카드 전용 입장 함수. 기존 enterSpecificHall(id)는
+    // 건드리지 않고 완전히 분리된 경로로 둔다 - 로컬/Lovable 전시관은 계속
+    // enterSpecificHall()만 사용한다.
+    //
+    // [설계 메모] visibility/operation_status를 이 함수에서 필드 값으로
+    // 다시 검사하려면 onhadaPublicExhibitions 배열에 그 두 필드가 있어야
+    // 하는데, getPublicExhibitions()의 현재 select 목록에는 없다(이번
+    // 단계는 js/db-service.js 수정이 금지되어 있다). 대신 아래
+    // renderPublicSupabaseArtworks()가 호출하는
+    // getPublicArtworksForExhibition()이 서버측에서 항상
+    // exhibitions!inner(visibility='public' AND operation_status='operating')
+    // 조인 조건을 강제하므로, 그 조인이 실질적인 재확인 역할을 한다 - 사용자
+    // 승인 하에 이렇게 처리하기로 결정했다.
+    function enterSupabaseExhibition(exhibitionId) {
+      const matched = onhadaPublicExhibitions.find(ex => ex.id === exhibitionId);
+      if (!matched) return;
+
+      activeHallId = null;
+      activeSupabaseExhibitionId = exhibitionId;
+
+      const titleEl = document.getElementById('hall-active-title');
+      const galleryGrid = document.getElementById('hall-gallery-container');
+      const subTabs = document.querySelector('.sub-tabs-bar');
+      const searchBox = document.querySelector('.search-box-wrapper');
+      const cardsGrid = document.getElementById('browse-halls-grid-container');
+
+      cardsGrid.style.display = 'none';
+      subTabs.style.display = 'none';
+      searchBox.style.display = 'none';
+      document.getElementById('hall-artworks-section').style.display = 'block';
+
+      if (titleEl) {
+        titleEl.textContent = '🚪 ' + (matched.title || '전시관') + (matched.organization_name ? (' (' + matched.organization_name + ')') : '');
+      }
+
+      renderPublicSupabaseArtworks(exhibitionId);
+    }
+
+    // 공개 관람객 화면 전용 - 신규 Supabase 내부 전시관의 승인된 작품만
+    // getPublicArtworksForExhibition()으로 조회해 그린다. 기존 localStorage
+    // 작품 렌더링(enterSpecificHall 내부)과는 완전히 분리된 함수다.
+    async function renderPublicSupabaseArtworks(exhibitionId) {
+      const galleryGrid = document.getElementById('hall-gallery-container');
+      if (!galleryGrid) return;
+
+      onhadaPublicArtworksRequestSeq += 1;
+      const requestSeq = onhadaPublicArtworksRequestSeq;
+
+      // 새 전시관을 그리기 직전에 이전 전시관에서 만든 blob URL을 정리한다.
+      onhadaRevokePublicArtworkBlobUrls();
+
+      galleryGrid.innerHTML = "";
+      const loadingMsg = document.createElement('div');
+      loadingMsg.style.cssText = "grid-column: 1/-1; text-align:center; padding:50px; color:var(--text-gray);";
+      loadingMsg.textContent = "전시 작품을 불러오는 중입니다...";
+      galleryGrid.appendChild(loadingMsg);
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getPublicArtworksForExhibition(exhibitionId);
+      } catch (err) {
+        result = { ok: false, artworks: [], error: null };
+      }
+
+      // stale 가드: 응답이 오는 사이 다른 전시관으로 이동했거나 새 요청이
+      // 시작됐으면 이 결과로 화면을 덮지 않는다.
+      if (requestSeq !== onhadaPublicArtworksRequestSeq || activeSupabaseExhibitionId !== exhibitionId) return;
+
+      galleryGrid.innerHTML = "";
+
+      if (!result.ok || !Array.isArray(result.artworks) || result.artworks.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = "grid-column: 1/-1; text-align:center; padding:50px; color:var(--text-gray);";
+        emptyMsg.textContent = "현재 공개된 작품이 없습니다.";
+        galleryGrid.appendChild(emptyMsg);
+        return;
+      }
+
+      result.artworks.forEach(art => {
+        const item = document.createElement('div');
+        item.className = 'gallery-card-item';
+
+        const imgWrapper = document.createElement('div');
+        imgWrapper.className = 'img-wrapper';
+        item.appendChild(imgWrapper);
+
+        const infoBox = document.createElement('div');
+        infoBox.className = 'gallery-card-info';
+
+        const catBadge = document.createElement('span');
+        catBadge.className = 'g-author-badge';
+        catBadge.textContent = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
+        infoBox.appendChild(catBadge);
+
+        const titleEl = document.createElement('h4');
+        titleEl.style.marginTop = '8px';
+        titleEl.textContent = art.title || '(제목 없음)';
+        infoBox.appendChild(titleEl);
+
+        const authorEl = document.createElement('div');
+        authorEl.className = 'g-author';
+        authorEl.textContent = art.artist_display_name || '작가 미상';
+        infoBox.appendChild(authorEl);
+
+        if (art.description) {
+          const descEl = document.createElement('p');
+          descEl.style.cssText = "font-size:0.85rem; color:var(--text-gray); margin-top:8px;";
+          descEl.textContent = art.description;
+          infoBox.appendChild(descEl);
+        }
+
+        if (art.poem) {
+          const poemEl = document.createElement('p');
+          poemEl.style.cssText = "font-size:0.9rem; color:#ddd; margin-top:8px; white-space:pre-wrap;";
+          poemEl.textContent = art.poem;
+          infoBox.appendChild(poemEl);
+        }
+
+        item.appendChild(infoBox);
+        galleryGrid.appendChild(item);
+
+        // media_type='text' 등 이미지가 아닌 작품은 Storage 다운로드를
+        // 전혀 시도하지 않는다.
+        if (art.media_type === 'image') {
+          onhadaLoadPublicArtworkImage(art, requestSeq, exhibitionId, imgWrapper);
+        }
+      });
+    }
+
+    // 이미지 작품 1건의 private Blob을 받아 표시한다. media_url을 우선
+    // 사용하고 없으면 thumbnail_url을 쓴다. public/signed URL은 절대
+    // 만들지 않는다.
+    async function onhadaLoadPublicArtworkImage(art, requestSeq, exhibitionId, containerEl) {
+      const path = art.media_url || art.thumbnail_url;
+      if (!path) {
+        onhadaShowPublicImageError(containerEl);
+        return;
+      }
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (!result.ok || !result.blob) {
+        if (requestSeq === onhadaPublicArtworksRequestSeq && activeSupabaseExhibitionId === exhibitionId) {
+          onhadaShowPublicImageError(containerEl);
+        }
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      // stale 가드: 다운로드가 끝난 시점에 이미 다른 전시관으로 이동했거나
+      // 새 조회가 시작됐다면, 방금 만든 object URL을 즉시 revoke하고
+      // 화면에는 넣지 않는다.
+      if (requestSeq !== onhadaPublicArtworksRequestSeq || activeSupabaseExhibitionId !== exhibitionId) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      onhadaPublicArtworkBlobUrls.set(art.id, objectUrl);
+
+      containerEl.innerHTML = "";
+      const img = document.createElement('img');
+      img.src = objectUrl;
+      img.alt = (art.title || '작품') + ' 이미지';
+      img.loading = 'lazy';
+      containerEl.appendChild(img);
+    }
+
+    // 경로/UUID/서버 오류 원문은 절대 노출하지 않는 안전한 안내만 표시한다.
+    function onhadaShowPublicImageError(containerEl) {
+      if (!containerEl) return;
+      containerEl.innerHTML = "";
+      const errMsg = document.createElement('p');
+      errMsg.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.85rem; padding: 20px 0;";
+      errMsg.textContent = "이미지를 불러올 수 없습니다.";
+      containerEl.appendChild(errMsg);
+    }
+
     function closeHallView() {
       document.getElementById('hall-artworks-section').style.display = 'none';
       document.getElementById('browse-halls-grid-container').style.display = 'grid';
@@ -3833,6 +4043,12 @@
       const allBtn = document.getElementById('btn-sub-browse-all');
       filterBrowseCategory('all', allBtn);
       document.getElementById('gallerySearchInput').value = "";
+
+      // 공개 Supabase 관람 상태 정리 - 관리자 미리보기 Map과는 분리된
+      // 이 화면 전용 Map만 정리한다.
+      onhadaPublicArtworksRequestSeq += 1;
+      activeSupabaseExhibitionId = null;
+      onhadaRevokePublicArtworkBlobUrls();
     }
 
     // [기관 전시관] 내부
@@ -4344,6 +4560,9 @@
     let onhadaCloudPreviewCompleted = new Set();
     let onhadaPublicExhibitions = [];
     let onhadaPublicExhibitionsRequestSeq = 0;
+    let activeSupabaseExhibitionId = null;
+    let onhadaPublicArtworksRequestSeq = 0;
+    let onhadaPublicArtworkBlobUrls = new Map();
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
