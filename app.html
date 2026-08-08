@@ -2883,6 +2883,15 @@
               </tbody>
             </table>
           </div>
+
+          <div class="admin-table-container" style="margin-top: 20px;">
+            <div class="admin-table-title">
+              <span>클라우드 승인 대기</span>
+              <button class="btn-hero-secondary" id="onhada-cloud-admin-refresh" onclick="renderCloudPendingArtworks()" style="font-size: 0.8rem;">새로고침</button>
+            </div>
+            <p id="onhada-cloud-admin-status" style="color:var(--text-gray); font-size:0.9rem; margin: 10px 0;"></p>
+            <div id="onhada-cloud-admin-list"></div>
+          </div>
         </div>
 
         <!-- 3. 전시관 만들기 -->
@@ -3113,6 +3122,21 @@
     </div>
   </div>
 
+  <!-- 클라우드 작품 반려 사유 입력 모달 -->
+  <div class="admin-login-overlay" id="onhada-reject-reason-modal">
+    <div class="admin-login-box">
+      <h3 style="font-size: 1.4rem; color: #fff; margin-bottom: 10px;">작품 반려 사유 입력</h3>
+      <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 20px;">입력하신 사유는 반려 처리에 사용됩니다.</p>
+
+      <textarea id="onhada-reject-reason-input" class="form-control" rows="4" maxlength="500" style="margin-bottom: 20px; resize: vertical;" placeholder="반려 사유를 입력해 주세요."></textarea>
+
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-hero-secondary" onclick="onhadaCancelRejectReason()" style="flex: 1;">취소</button>
+        <button class="btn-hero-primary" onclick="onhadaConfirmRejectReason()" style="flex: 1;">확인</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 알림 경고 팝업 -->
   <div class="alert-dialog-overlay" id="alert-dialog">
     <div class="alert-dialog-box">
@@ -3128,9 +3152,9 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 세 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-3"></script>
-  <script src="js/auth-service.js?v=20260808-3"></script>
-  <script src="js/db-service.js?v=20260808-3"></script>
+  <script src="js/supabase-client.js?v=20260808-4"></script>
+  <script src="js/auth-service.js?v=20260808-4"></script>
+  <script src="js/db-service.js?v=20260808-4"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4129,10 +4153,14 @@
     let currentManagedExhibitionId = null;
     let currentManagerCategories = null;
     let onhadaCategoriesLoadPromise = null;
+    let onhadaCloudPendingArtworks = [];
+    let onhadaCloudAdminRequestSeq = 0;
+    let onhadaRejectReasonResolve = null;
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
         switchView('admin');
+        renderCloudPendingArtworks();
       } else if (isManagerAuthenticated) {
         switchView('manager');
         const adminNavBtn = document.getElementById('nav-btn-admin');
@@ -4174,6 +4202,7 @@
           if (passEl) passEl.value = "";
           closeAdminLogin();
           switchView('admin');
+          renderCloudPendingArtworks();
           return;
         }
 
@@ -4497,12 +4526,25 @@
 
         const categoryName = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
 
-        [categoryName, onhadaMediaTypeLabel(art.media_type), onhadaArtworkStatusLabel(art.status)].forEach(labelText => {
+        [categoryName, onhadaMediaTypeLabel(art.media_type)].forEach(labelText => {
           const badge = document.createElement('span');
           badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
           badge.textContent = labelText;
           badgeRow.appendChild(badge);
         });
+
+        const statusBadge = document.createElement('span');
+        if (art.status === 'approved') {
+          statusBadge.style.cssText = "background: rgba(16,185,129,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #10b981;";
+        } else if (art.status === 'rejected') {
+          statusBadge.style.cssText = "background: rgba(239,68,68,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #ef4444;";
+        } else if (art.status === 'pending') {
+          statusBadge.style.cssText = "background: rgba(245,158,11,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #f59e0b;";
+        } else {
+          statusBadge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: var(--text-gray);";
+        }
+        statusBadge.textContent = onhadaArtworkStatusLabel(art.status);
+        badgeRow.appendChild(statusBadge);
 
         const consentBadge = document.createElement('span');
         if (art.consent_confirmed) {
@@ -4678,6 +4720,203 @@
         platformData.splice(index, 1);
         saveDatabase();
         showAlertDialog("반려 처리", `"${title}" 제출 서류가 안전하게 반려 및 보완 처리되었습니다.`, "❌");
+      }
+    }
+
+    // renderAllViews()에는 포함하지 않는다 - admin 로그인 성공 또는
+    // 운영자 메뉴에서 admin 화면 진입 시에만 명시적으로 호출해 화면 전환마다
+    // Supabase 조회가 반복되지 않게 한다.
+    async function renderCloudPendingArtworks() {
+      if (!isAdminAuthenticated) return;
+
+      const statusEl = document.getElementById('onhada-cloud-admin-status');
+      const listEl = document.getElementById('onhada-cloud-admin-list');
+
+      onhadaCloudAdminRequestSeq += 1;
+      const requestSeq = onhadaCloudAdminRequestSeq;
+
+      if (statusEl) statusEl.textContent = "클라우드 승인 대기 목록을 불러오는 중입니다...";
+      if (listEl) listEl.innerHTML = "";
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getPendingArtworksForAdmin();
+      } catch (err) {
+        result = { ok: false, artworks: [], error: { code: 'unexpected_error', message: '클라우드 승인 대기 목록을 불러오지 못했습니다.' } };
+      }
+
+      // stale 응답 가드: 응답이 오는 사이 새 요청이 시작됐으면 이 결과는 버린다.
+      if (requestSeq !== onhadaCloudAdminRequestSeq) return;
+
+      if (!result.ok) {
+        onhadaCloudPendingArtworks = [];
+        if (statusEl) statusEl.textContent = (result.error && result.error.message) || "클라우드 승인 대기 목록을 불러오지 못했습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      const artworks = result.artworks;
+      onhadaCloudPendingArtworks = artworks;
+
+      if (artworks.length === 0) {
+        if (statusEl) statusEl.textContent = "클라우드 승인 대기 작품이 없습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `클라우드 승인 대기 ${artworks.length}건`;
+      if (listEl) listEl.innerHTML = "";
+
+      artworks.forEach(art => {
+        const row = document.createElement('div');
+        row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
+
+        const titleEl = document.createElement('h4');
+        titleEl.style.cssText = "color:#fff; margin-bottom:6px;";
+        titleEl.textContent = art.title || '(제목 없음)';
+        row.appendChild(titleEl);
+
+        const authorEl = document.createElement('p');
+        authorEl.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:8px;";
+        authorEl.textContent = art.artist_display_name || '작가 미상';
+        row.appendChild(authorEl);
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;";
+
+        const exhibitionTitle = (art.exhibitions && art.exhibitions.title) ? art.exhibitions.title : '전시관 미확인';
+        const categoryName = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
+
+        [exhibitionTitle, categoryName, onhadaMediaTypeLabel(art.media_type)].forEach(labelText => {
+          const badge = document.createElement('span');
+          badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+          badge.textContent = labelText;
+          badgeRow.appendChild(badge);
+        });
+
+        row.appendChild(badgeRow);
+
+        const dateEl = document.createElement('p');
+        dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-bottom:10px;";
+        dateEl.textContent = "제출일: " + onhadaFormatDate(art.created_at);
+        row.appendChild(dateEl);
+
+        const consentEl = document.createElement('p');
+        if (art.consent_confirmed) {
+          consentEl.style.cssText = "color:#10b981; font-size:0.85rem; font-weight:700; margin-bottom:10px;";
+          consentEl.textContent = "전시 동의 확인";
+        } else {
+          consentEl.style.cssText = "color:#ef4444; font-size:0.85rem; font-weight:700; margin-bottom:10px;";
+          consentEl.textContent = "전시 동의 미확인";
+        }
+        row.appendChild(consentEl);
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = "display:flex; gap:10px;";
+
+        const approveBtn = document.createElement('button');
+        approveBtn.className = "btn-approve";
+        approveBtn.textContent = "승인";
+        approveBtn.disabled = !art.consent_confirmed;
+        approveBtn.addEventListener('click', () => onhadaApproveCloudArtwork(art.id, approveBtn));
+        btnRow.appendChild(approveBtn);
+
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = "btn-reject";
+        rejectBtn.textContent = "반려";
+        rejectBtn.addEventListener('click', () => onhadaRejectCloudArtwork(art.id, rejectBtn));
+        btnRow.appendChild(rejectBtn);
+
+        row.appendChild(btnRow);
+
+        if (listEl) listEl.appendChild(row);
+      });
+    }
+
+    async function onhadaApproveCloudArtwork(artworkId, buttonEl) {
+      const found = onhadaCloudPendingArtworks.find(art => art.id === artworkId);
+      if (!found) return;
+
+      if (buttonEl) buttonEl.disabled = true;
+
+      try {
+        const result = await window.ONHADA_BACKEND.db.approveArtworkAsAdmin(artworkId);
+
+        if (!result.ok) {
+          showAlertDialog("승인 실패", (result.error && result.error.message) || "작품 승인에 실패했습니다.", "⚠️");
+          return;
+        }
+
+        showAlertDialog("승인 완료", `"${found.title || '작품'}"이(가) 승인되었습니다.`, "✔️");
+        renderCloudPendingArtworks();
+      } finally {
+        if (buttonEl) buttonEl.disabled = false;
+      }
+    }
+
+    // 브라우저 네이티브 prompt()는 자동화/인앱 웹뷰 등 일부 환경에서
+    // 지원되지 않을 수 있어, 앱 자체 모달로 반려 사유를 입력받는다.
+    function onhadaShowRejectReasonModal() {
+      return new Promise((resolve) => {
+        const overlay = document.getElementById('onhada-reject-reason-modal');
+        const input = document.getElementById('onhada-reject-reason-input');
+
+        if (onhadaRejectReasonResolve) {
+          const previousResolve = onhadaRejectReasonResolve;
+          onhadaRejectReasonResolve = null;
+          previousResolve(null);
+        }
+
+        onhadaRejectReasonResolve = resolve;
+        if (input) input.value = "";
+        if (overlay) overlay.style.display = 'flex';
+      });
+    }
+
+    function onhadaConfirmRejectReason() {
+      const overlay = document.getElementById('onhada-reject-reason-modal');
+      const input = document.getElementById('onhada-reject-reason-input');
+      const resolve = onhadaRejectReasonResolve;
+      onhadaRejectReasonResolve = null;
+      if (overlay) overlay.style.display = 'none';
+      if (resolve) resolve(input ? input.value : "");
+    }
+
+    function onhadaCancelRejectReason() {
+      const overlay = document.getElementById('onhada-reject-reason-modal');
+      const resolve = onhadaRejectReasonResolve;
+      onhadaRejectReasonResolve = null;
+      if (overlay) overlay.style.display = 'none';
+      if (resolve) resolve(null);
+    }
+
+    async function onhadaRejectCloudArtwork(artworkId, buttonEl) {
+      const found = onhadaCloudPendingArtworks.find(art => art.id === artworkId);
+      if (!found) return;
+
+      const reason = await onhadaShowRejectReasonModal();
+      if (reason === null) return;
+
+      const trimmedReason = reason.trim();
+      if (!trimmedReason) {
+        showAlertDialog("반려 실패", "반려 사유를 입력해야 합니다.", "⚠️");
+        return;
+      }
+
+      if (buttonEl) buttonEl.disabled = true;
+
+      try {
+        const result = await window.ONHADA_BACKEND.db.rejectArtworkAsAdmin(artworkId, trimmedReason);
+
+        if (!result.ok) {
+          showAlertDialog("반려 실패", (result.error && result.error.message) || "작품 반려에 실패했습니다.", "⚠️");
+          return;
+        }
+
+        showAlertDialog("반려 완료", `"${found.title || '작품'}"이(가) 반려되었습니다.`, "❌");
+        renderCloudPendingArtworks();
+      } finally {
+        if (buttonEl) buttonEl.disabled = false;
       }
     }
 

@@ -305,10 +305,158 @@
         }
     }
 
+    async function getPendingArtworksForAdmin() {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, artworks: [], error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, artworks: [], error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, artworks: [], error: safeError('role_not_allowed', '승인 대기 목록 조회는 관리자 계정만 가능합니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artworks: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .select(`
+                    id,
+                    exhibition_id,
+                    category_id,
+                    title,
+                    media_type,
+                    artist_display_name,
+                    status,
+                    consent_confirmed,
+                    created_at,
+                    categories (
+                        id,
+                        name
+                    ),
+                    exhibitions (
+                        id,
+                        title,
+                        exhibition_type,
+                        visibility,
+                        is_demo
+                    )
+                `)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                return { ok: false, artworks: [], error: safeError('artworks_fetch_failed', '승인 대기 작품 목록을 불러오지 못했습니다.') };
+            }
+
+            return { ok: true, artworks: Array.isArray(data) ? data : [], error: null };
+        } catch (err) {
+            return { ok: false, artworks: [], error: safeError('unexpected_error', '승인 대기 작품 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    async function approveArtworkAsAdmin(artworkId) {
+        if (!artworkId) {
+            return { ok: false, error: safeError('invalid_artwork_id', '작품 정보가 올바르지 않습니다.') };
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, error: safeError('role_not_allowed', '작품 승인은 관리자 계정만 가능합니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { error } = await client.rpc('approve_artwork', { target_artwork_id: artworkId });
+
+            if (error) {
+                return { ok: false, error: safeError('artwork_approve_failed', error.message || '작품 승인에 실패했습니다.') };
+            }
+
+            return { ok: true, error: null };
+        } catch (err) {
+            return { ok: false, error: safeError('unexpected_error', '작품 승인 중 오류가 발생했습니다.') };
+        }
+    }
+
+    async function rejectArtworkAsAdmin(artworkId, reason) {
+        if (!artworkId) {
+            return { ok: false, error: safeError('invalid_artwork_id', '작품 정보가 올바르지 않습니다.') };
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, error: safeError('role_not_allowed', '작품 반려는 관리자 계정만 가능합니다.') };
+        }
+
+        const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+
+        if (!trimmedReason) {
+            return { ok: false, error: safeError('reason_required', '반려 사유를 입력해 주세요.') };
+        }
+
+        if (trimmedReason.length > 500) {
+            return { ok: false, error: safeError('reason_too_long', '반려 사유는 500자를 초과할 수 없습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { error } = await client.rpc('reject_artwork', { target_artwork_id: artworkId, reason: trimmedReason });
+
+            if (error) {
+                return { ok: false, error: safeError('artwork_reject_failed', error.message || '작품 반려에 실패했습니다.') };
+            }
+
+            return { ok: true, error: null };
+        } catch (err) {
+            return { ok: false, error: safeError('unexpected_error', '작품 반려 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.db = {
         getMyManagedExhibitions: getMyManagedExhibitions,
         getManagedArtworks: getManagedArtworks,
         getCategories: getCategories,
-        createManagedArtwork: createManagedArtwork
+        createManagedArtwork: createManagedArtwork,
+        getPendingArtworksForAdmin: getPendingArtworksForAdmin,
+        approveArtworkAsAdmin: approveArtworkAsAdmin,
+        rejectArtworkAsAdmin: rejectArtworkAsAdmin
     };
 })();
