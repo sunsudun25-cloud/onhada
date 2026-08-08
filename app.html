@@ -2807,6 +2807,36 @@
           <button class="btn-hero-primary" id="onhada-manager-artwork-submit" onclick="onhadaSubmitManagedArtwork()" style="width:100%;" disabled>작품 등록</button>
           <p id="onhada-manager-artwork-status" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px;"></p>
         </div>
+
+        <div id="onhada-manager-image-section" style="display:none; margin-top: 30px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px;">
+          <h3 style="color:#fff; margin-bottom:6px;">이미지 작품 등록</h3>
+          <p id="onhada-manager-image-target" style="color:var(--text-gray); font-size:0.85rem; margin-bottom:16px;"></p>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">이미지 파일</label>
+          <input type="file" id="onhada-manager-image-file" class="form-control" accept="image/jpeg,image/png,image/webp" required style="margin-bottom:14px;">
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작품명</label>
+          <input type="text" id="onhada-manager-image-title" class="form-control" maxlength="100" style="margin-bottom:14px;">
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작가 표시명</label>
+          <input type="text" id="onhada-manager-image-author" class="form-control" maxlength="50" style="margin-bottom:14px;">
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">카테고리</label>
+          <select id="onhada-manager-image-category" class="form-control" style="margin-bottom:14px;">
+            <option value="" style="background: #090916; color: #fff;">카테고리를 선택하세요</option>
+          </select>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작품 설명</label>
+          <textarea id="onhada-manager-image-description" class="form-control" maxlength="500" rows="3" style="margin-bottom:14px; resize:vertical;"></textarea>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; cursor:pointer;">
+            <input type="checkbox" id="onhada-manager-image-consent" onchange="onhadaUpdateManagerImageSubmitState()" style="margin-top:3px;">
+            <span>작가 또는 보호자에게 온라인 전시 및 작품 공개 동의를 확인했습니다.</span>
+          </label>
+
+          <button class="btn-hero-primary" id="onhada-manager-image-submit" onclick="onhadaSubmitManagedImageArtwork()" style="width:100%;" disabled>이미지 작품 등록</button>
+          <p id="onhada-manager-image-status" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px;"></p>
+        </div>
       </div>
 
       <!-- ============================================== -->
@@ -3152,10 +3182,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-6"></script>
-  <script src="js/auth-service.js?v=20260808-6"></script>
-  <script src="js/db-service.js?v=20260808-6"></script>
-  <script src="js/storage-service.js?v=20260808-6"></script>
+  <script src="js/supabase-client.js?v=20260808-7"></script>
+  <script src="js/auth-service.js?v=20260808-7"></script>
+  <script src="js/db-service.js?v=20260808-7"></script>
+  <script src="js/storage-service.js?v=20260808-7"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4157,6 +4187,7 @@
     let onhadaCloudPendingArtworks = [];
     let onhadaCloudAdminRequestSeq = 0;
     let onhadaRejectReasonResolve = null;
+    let onhadaManagerImageCategoriesPopulated = false;
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
@@ -4263,6 +4294,7 @@
         currentManagedExhibitionId = null;
         const passEl = document.getElementById('admin-passcode');
         if (passEl) passEl.value = "";
+        onhadaResetManagedImageForm(null);
         switchView('browse');
       }
       showAlertDialog("로그아웃 완료", "운영자 세션이 안전하게 종료되었습니다.", "🔒");
@@ -4334,6 +4366,7 @@
       }
 
       onhadaResetManagedArtworkForm(found);
+      onhadaResetManagedImageForm(found);
       renderManagedArtworks(exhibitionId);
     }
 
@@ -4468,6 +4501,235 @@
         renderManagedArtworks(currentManagedExhibitionId);
       } finally {
         onhadaUpdateArtworkSubmitState();
+      }
+    }
+
+    // 전시관을 선택/변경(또는 로그아웃)할 때마다 이미지 등록 폼을 초기화한다.
+    // exhibition이 없으면(로그아웃 등) 폼을 완전히 숨기고 비운다.
+    function onhadaResetManagedImageForm(exhibition) {
+      const sectionEl = document.getElementById('onhada-manager-image-section');
+      const targetEl = document.getElementById('onhada-manager-image-target');
+      const fileEl = document.getElementById('onhada-manager-image-file');
+      const titleEl = document.getElementById('onhada-manager-image-title');
+      const authorEl = document.getElementById('onhada-manager-image-author');
+      const categoryEl = document.getElementById('onhada-manager-image-category');
+      const descriptionEl = document.getElementById('onhada-manager-image-description');
+      const consentEl = document.getElementById('onhada-manager-image-consent');
+      const statusEl = document.getElementById('onhada-manager-image-status');
+
+      if (fileEl) fileEl.value = "";
+      if (titleEl) titleEl.value = "";
+      if (authorEl) authorEl.value = "";
+      if (categoryEl) categoryEl.value = "";
+      if (descriptionEl) descriptionEl.value = "";
+      if (consentEl) consentEl.checked = false;
+      if (statusEl) statusEl.textContent = "";
+
+      if (!exhibition) {
+        if (sectionEl) sectionEl.style.display = 'none';
+        if (targetEl) targetEl.textContent = "";
+        onhadaUpdateManagerImageSubmitState();
+        return;
+      }
+
+      if (sectionEl) sectionEl.style.display = 'block';
+      if (targetEl) targetEl.textContent = (exhibition.title ? exhibition.title : '전시관') + '에 이미지 작품을 등록합니다.';
+
+      onhadaPopulateManagerImageCategories();
+      onhadaUpdateManagerImageSubmitState();
+    }
+
+    // 텍스트 등록 폼과 동일한 카테고리 캐시(currentManagerCategories)를
+    // 재사용한다 - onhadaLoadManagerCategories()가 이미 진행 중이거나 완료된
+    // 요청을 그대로 돌려주므로 이미지 폼 때문에 별도로 카테고리 API를
+    // 다시 호출하지 않는다.
+    async function onhadaPopulateManagerImageCategories() {
+      const categories = await onhadaLoadManagerCategories();
+      const categorySelect = document.getElementById('onhada-manager-image-category');
+
+      if (!onhadaManagerImageCategoriesPopulated && categorySelect && Array.isArray(categories) && categories.length > 0) {
+        categories.forEach(cat => {
+          const option = document.createElement('option');
+          option.value = cat.id;
+          option.textContent = cat.name;
+          option.style.background = '#090916';
+          option.style.color = '#fff';
+          categorySelect.appendChild(option);
+        });
+        onhadaManagerImageCategoriesPopulated = true;
+      }
+
+      onhadaUpdateManagerImageSubmitState();
+    }
+
+    // 카테고리가 정상적으로 로드됐고, 동의 체크박스가 선택된 경우에만
+    // 이미지 등록 버튼을 활성화한다(텍스트 등록 폼과 동일한 조건).
+    function onhadaUpdateManagerImageSubmitState() {
+      const submitBtn = document.getElementById('onhada-manager-image-submit');
+      const consentEl = document.getElementById('onhada-manager-image-consent');
+      if (!submitBtn) return;
+
+      const categoriesReady = Array.isArray(currentManagerCategories) && currentManagerCategories.length > 0;
+      const consentChecked = !!(consentEl && consentEl.checked);
+
+      submitBtn.disabled = !(categoriesReady && consentChecked);
+    }
+
+    async function onhadaSubmitManagedImageArtwork() {
+      if (!currentManagedExhibitionId) return;
+      if (!currentManagedExhibitions.some(ex => ex.id === currentManagedExhibitionId)) return;
+
+      // 제출 처리 도중 사용자가 다른 전시관으로 바꾸더라도, 이번 제출은
+      // 항상 이 전시관 기준으로만 진행한다(지역 변수에 고정).
+      const processingExhibitionId = currentManagedExhibitionId;
+
+      const submitBtn = document.getElementById('onhada-manager-image-submit');
+      const statusEl = document.getElementById('onhada-manager-image-status');
+      const fileEl = document.getElementById('onhada-manager-image-file');
+      const titleEl = document.getElementById('onhada-manager-image-title');
+      const authorEl = document.getElementById('onhada-manager-image-author');
+      const categoryEl = document.getElementById('onhada-manager-image-category');
+      const descriptionEl = document.getElementById('onhada-manager-image-description');
+      const consentEl = document.getElementById('onhada-manager-image-consent');
+
+      const file = fileEl && fileEl.files ? fileEl.files[0] : null;
+      const title = titleEl ? titleEl.value.trim() : '';
+      const artistDisplayName = authorEl ? authorEl.value.trim() : '';
+      const categoryId = categoryEl ? categoryEl.value : '';
+      const description = descriptionEl ? descriptionEl.value.trim() : '';
+      const consentChecked = !!(consentEl && consentEl.checked);
+
+      // 클라이언트 사전 검증 - accept 속성만 믿지 않고 여기서도 다시 검사한다.
+      if (!(file instanceof File)) {
+        if (statusEl) statusEl.textContent = "이미지 파일을 선택해 주세요.";
+        return;
+      }
+
+      if (['image/jpeg', 'image/png', 'image/webp'].indexOf(file.type) === -1) {
+        if (statusEl) statusEl.textContent = "JPEG, PNG, WEBP 형식만 업로드할 수 있습니다.";
+        return;
+      }
+
+      if (!(file.size > 0) || file.size > 5 * 1024 * 1024) {
+        if (statusEl) statusEl.textContent = "이미지 용량은 5MB를 초과할 수 없습니다.";
+        return;
+      }
+
+      if (!title || title.length > 100) {
+        if (statusEl) statusEl.textContent = "작품명을 100자 이내로 입력해 주세요.";
+        return;
+      }
+
+      if (!artistDisplayName || artistDisplayName.length > 50) {
+        if (statusEl) statusEl.textContent = "작가 표시명을 50자 이내로 입력해 주세요.";
+        return;
+      }
+
+      if (!categoryId) {
+        if (statusEl) statusEl.textContent = "카테고리를 선택해 주세요.";
+        return;
+      }
+
+      if (description.length > 500) {
+        if (statusEl) statusEl.textContent = "작품 설명은 500자를 초과할 수 없습니다.";
+        return;
+      }
+
+      if (!consentChecked) {
+        if (statusEl) statusEl.textContent = "전시 동의 확인이 필요합니다.";
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+      if (statusEl) statusEl.textContent = "이미지를 안전하게 처리하고 업로드하는 중입니다.";
+
+      try {
+        let uploadResult;
+        try {
+          uploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkImage(processingExhibitionId, file);
+        } catch (err) {
+          uploadResult = { ok: false, path: null, error: { code: 'unexpected_error', message: '이미지 업로드 중 오류가 발생했습니다.' } };
+        }
+
+        if (!uploadResult.ok) {
+          if (statusEl) statusEl.textContent = (uploadResult.error && uploadResult.error.message) || "이미지 업로드에 실패했습니다.";
+          return;
+        }
+
+        // stale 감지: 업로드하는 동안 사용자가 다른 전시관으로 바꿨다면 이
+        // 전시관에 잘못 등록하지 않는다. 방금 올린 파일만 조용히 정리한다.
+        if (currentManagedExhibitionId !== processingExhibitionId) {
+          try {
+            await window.ONHADA_BACKEND.storage.removeManagedArtworkAsset(uploadResult.path);
+          } catch (err) {
+            // 실패해도 조용히 무시 - orphan 파일은 담당 매니저가 추후 정리 가능.
+          }
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = "작품 정보를 승인 대기 상태로 저장하는 중입니다.";
+
+        const dbInput = {
+          title: title,
+          artist_display_name: artistDisplayName,
+          category_id: categoryId,
+          description: description,
+          consent_confirmed: true,
+          media_path: uploadResult.path
+        };
+
+        let dbResult;
+        try {
+          dbResult = await window.ONHADA_BACKEND.db.createManagedImageArtwork(processingExhibitionId, dbInput);
+        } catch (err) {
+          dbResult = { ok: false, artwork: null, error: { code: 'unexpected_error', message: '작품 저장 중 오류가 발생했습니다.' } };
+        }
+
+        if (dbResult.ok) {
+          if (currentManagedExhibitionId === processingExhibitionId) {
+            if (fileEl) fileEl.value = "";
+            if (titleEl) titleEl.value = "";
+            if (authorEl) authorEl.value = "";
+            if (categoryEl) categoryEl.value = "";
+            if (descriptionEl) descriptionEl.value = "";
+            if (consentEl) consentEl.checked = false;
+            if (statusEl) statusEl.textContent = "이미지 작품이 승인 대기 상태로 등록되었습니다.";
+
+            renderManagedArtworks(processingExhibitionId);
+          }
+          return;
+        }
+
+        // DB 저장 실패 - 화면에 어떤 전시관이 표시 중이든, 방금 올린 파일은
+        // 항상 보상 삭제를 시도해 orphan을 남기지 않는다.
+        if (currentManagedExhibitionId === processingExhibitionId && statusEl) {
+          statusEl.textContent = "작품 저장에 실패하여 업로드 파일을 정리하고 있습니다.";
+        }
+
+        let removeResult;
+        try {
+          removeResult = await window.ONHADA_BACKEND.storage.removeManagedArtworkAsset(uploadResult.path);
+        } catch (err) {
+          removeResult = { ok: false, error: null };
+        }
+
+        if (currentManagedExhibitionId === processingExhibitionId) {
+          if (removeResult.ok) {
+            // 파일 input만 안전을 위해 비우고, 제목·작가·설명·카테고리는
+            // 그대로 유지해 사용자가 이미지만 다시 선택하면 되게 한다.
+            if (fileEl) fileEl.value = "";
+            if (statusEl) {
+              const baseMsg = (dbResult.error && dbResult.error.message) || "작품 저장에 실패했습니다.";
+              statusEl.textContent = baseMsg + " 입력하신 내용은 유지되었습니다. 이미지를 다시 선택해 등록해 주세요.";
+            }
+          } else {
+            // 페이지 이탈 등으로 정리되지 못한 orphan 파일은 후속 관리자
+            // 도구(예: Storage 정리 화면)에서 처리하는 것을 후속 과제로 남긴다.
+            if (statusEl) statusEl.textContent = "작품 저장과 임시 파일 정리에 실패했습니다. 다시 제출하지 말고 관리자에게 문의해 주세요.";
+          }
+        }
+      } finally {
+        onhadaUpdateManagerImageSubmitState();
       }
     }
 
