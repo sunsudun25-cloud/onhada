@@ -3182,10 +3182,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-7"></script>
-  <script src="js/auth-service.js?v=20260808-7"></script>
-  <script src="js/db-service.js?v=20260808-7"></script>
-  <script src="js/storage-service.js?v=20260808-7"></script>
+  <script src="js/supabase-client.js?v=20260808-8"></script>
+  <script src="js/auth-service.js?v=20260808-8"></script>
+  <script src="js/db-service.js?v=20260808-8"></script>
+  <script src="js/storage-service.js?v=20260808-8"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4188,6 +4188,8 @@
     let onhadaCloudAdminRequestSeq = 0;
     let onhadaRejectReasonResolve = null;
     let onhadaManagerImageCategoriesPopulated = false;
+    let onhadaCloudPreviewUrls = new Map();
+    let onhadaCloudPreviewCompleted = new Set();
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
@@ -4278,6 +4280,7 @@
         currentManagedExhibitionId = null;
         const passEl = document.getElementById('admin-passcode');
         if (passEl) passEl.value = "";
+        onhadaRevokeCloudPreviewUrls();
         switchView('browse');
       }
       showAlertDialog("로그아웃 완료", "기관 권한 세션이 안전하게 자동 파기되었습니다.", "🔒");
@@ -4989,6 +4992,22 @@
     // renderAllViews()에는 포함하지 않는다 - admin 로그인 성공 또는
     // 운영자 메뉴에서 admin 화면 진입 시에만 명시적으로 호출해 화면 전환마다
     // Supabase 조회가 반복되지 않게 한다.
+    // 직접 생성한 blob object URL만 정리한다(Supabase SDK 세션 URL 등 다른
+    // URL은 절대 건드리지 않는다).
+    function onhadaRevokeCloudPreviewUrls() {
+      onhadaCloudPreviewUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+      });
+      onhadaCloudPreviewUrls.clear();
+      onhadaCloudPreviewCompleted.clear();
+    }
+
+    // 페이지 이탈 시 남아있는 blob object URL을 정리한다. 확인창은 띄우지
+    // 않는다(returnValue/preventDefault를 쓰지 않음).
+    window.addEventListener('beforeunload', function () {
+      onhadaRevokeCloudPreviewUrls();
+    });
+
     async function renderCloudPendingArtworks() {
       if (!isAdminAuthenticated) return;
 
@@ -4997,6 +5016,9 @@
 
       onhadaCloudAdminRequestSeq += 1;
       const requestSeq = onhadaCloudAdminRequestSeq;
+
+      // 새 목록을 그리기 직전에 이전 미리보기 object URL을 전부 정리한다.
+      onhadaRevokeCloudPreviewUrls();
 
       if (statusEl) statusEl.textContent = "클라우드 승인 대기 목록을 불러오는 중입니다...";
       if (listEl) listEl.innerHTML = "";
@@ -5074,14 +5096,34 @@
         }
         row.appendChild(consentEl);
 
-        const btnRow = document.createElement('div');
-        btnRow.style.cssText = "display:flex; gap:10px;";
+        const isImageArtwork = art.media_type === 'image';
 
         const approveBtn = document.createElement('button');
         approveBtn.className = "btn-approve";
         approveBtn.textContent = "승인";
-        approveBtn.disabled = !art.consent_confirmed;
+        // 이미지 작품은 동의 확인 + 미리보기 완료가 모두 참일 때만 활성화한다.
+        // 미리보기 완료 Set은 매 렌더링마다 새로 비워지므로, 이미지 작품은
+        // 항상 "확인 전" 상태로 시작한다.
+        approveBtn.disabled = !art.consent_confirmed || (isImageArtwork && !onhadaCloudPreviewCompleted.has(art.id));
         approveBtn.addEventListener('click', () => onhadaApproveCloudArtwork(art.id, approveBtn));
+
+        if (isImageArtwork) {
+          const previewContainer = document.createElement('div');
+          previewContainer.style.cssText = "margin-bottom:10px;";
+          row.appendChild(previewContainer);
+
+          const previewBtn = document.createElement('button');
+          previewBtn.className = "btn-hero-secondary";
+          previewBtn.textContent = "이미지 확인";
+          previewBtn.style.cssText = "font-size:0.8rem; margin-bottom:10px;";
+          previewBtn.addEventListener('click', () => {
+            onhadaLoadCloudArtworkPreview(art.id, requestSeq, previewBtn, previewContainer, approveBtn);
+          });
+          row.appendChild(previewBtn);
+        }
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = "display:flex; gap:10px;";
         btnRow.appendChild(approveBtn);
 
         const rejectBtn = document.createElement('button');
@@ -5094,6 +5136,87 @@
 
         if (listEl) listEl.appendChild(row);
       });
+    }
+
+    // 클라우드 승인 대기 카드의 "이미지 확인" 버튼 핸들러. private 버킷의
+    // Blob을 받아 object URL로만 표시하고, path/UUID는 DOM이나 console에
+    // 절대 출력하지 않는다.
+    async function onhadaLoadCloudArtworkPreview(artworkId, requestSeq, buttonEl, containerEl, approveBtnEl) {
+      if (!isAdminAuthenticated) return;
+
+      const found = onhadaCloudPendingArtworks.find(art => art.id === artworkId);
+      if (!found || found.media_type !== 'image') return;
+
+      if (buttonEl) buttonEl.disabled = true;
+
+      if (containerEl) {
+        containerEl.innerHTML = "";
+        const loadingMsg = document.createElement('p');
+        loadingMsg.style.cssText = "color:var(--text-gray); font-size:0.8rem;";
+        loadingMsg.textContent = "이미지를 불러오는 중입니다.";
+        containerEl.appendChild(loadingMsg);
+      }
+
+      const path = found.thumbnail_url || found.media_url;
+
+      let result;
+      if (!path) {
+        result = { ok: false, blob: null, error: { code: 'invalid_storage_path', message: '이미지 경로 정보를 찾을 수 없습니다.' } };
+      } else {
+        try {
+          result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(path);
+        } catch (err) {
+          result = { ok: false, blob: null, error: { code: 'unexpected_error', message: '이미지를 불러오지 못했습니다.' } };
+        }
+      }
+
+      // stale 감지: 다운로드하는 동안 목록이 재조회됐다면 이 결과는 버린다.
+      // object URL은 아직 만들지 않았으므로 별도로 revoke할 것도 없다.
+      if (requestSeq !== onhadaCloudAdminRequestSeq) return;
+
+      if (!result.ok) {
+        if (containerEl) {
+          containerEl.innerHTML = "";
+          const errMsg = document.createElement('p');
+          errMsg.style.cssText = "color:#ef4444; font-size:0.8rem;";
+          errMsg.textContent = (result.error && result.error.message) || "이미지를 불러오지 못했습니다.";
+          containerEl.appendChild(errMsg);
+        }
+        if (buttonEl) buttonEl.disabled = false;
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      const existingUrl = onhadaCloudPreviewUrls.get(artworkId);
+      if (existingUrl) {
+        URL.revokeObjectURL(existingUrl);
+      }
+      onhadaCloudPreviewUrls.set(artworkId, objectUrl);
+
+      if (containerEl) {
+        containerEl.innerHTML = "";
+
+        const img = document.createElement('img');
+        img.src = objectUrl;
+        img.alt = (found.title || '작품') + ' 미리보기';
+        img.loading = 'lazy';
+        img.style.cssText = "max-width:100%; max-height:320px; object-fit:contain; border-radius:12px; display:block;";
+        containerEl.appendChild(img);
+
+        const doneMsg = document.createElement('p');
+        doneMsg.style.cssText = "color:#10b981; font-size:0.8rem; font-weight:700; margin-top:6px;";
+        doneMsg.textContent = "이미지 확인 완료";
+        containerEl.appendChild(doneMsg);
+      }
+
+      onhadaCloudPreviewCompleted.add(artworkId);
+
+      if (buttonEl) buttonEl.disabled = false;
+
+      if (approveBtnEl) {
+        approveBtnEl.disabled = !found.consent_confirmed;
+      }
     }
 
     async function onhadaApproveCloudArtwork(artworkId, buttonEl) {

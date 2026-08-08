@@ -482,6 +482,8 @@
                     status,
                     consent_confirmed,
                     created_at,
+                    thumbnail_url,
+                    media_url,
                     categories (
                         id,
                         name

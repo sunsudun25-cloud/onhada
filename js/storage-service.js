@@ -39,6 +39,25 @@
         return typeof value === 'string' && ASSET_FILE_NAME_RE.test(value);
     }
 
+    // downloadArtworkAsset 전용 경로 검증. remove와 달리 URL/역슬래시/공백/
+    // query/fragment/상위경로 이동까지 명시적으로 차단한다(admin/anon도
+    // 호출할 수 있어 경로 형식 자체를 더 엄격히 검사한다).
+    function isValidAssetPath(path) {
+        if (typeof path !== 'string' || path.length === 0) return false;
+        if (path.indexOf('://') !== -1) return false;
+        if (path.charAt(0) === '/') return false;
+        if (path.indexOf('\\') !== -1) return false;
+        if (path.indexOf(' ') !== -1) return false;
+        if (path.indexOf('?') !== -1) return false;
+        if (path.indexOf('#') !== -1) return false;
+        if (path.indexOf('..') !== -1) return false;
+
+        var segments = path.split('/');
+        if (segments.length !== 2) return false;
+
+        return isUuidLike(segments[0]) && isValidAssetFileName(segments[1]);
+    }
+
     function extensionForMime(mimeType) {
         return Object.prototype.hasOwnProperty.call(ALLOWED_MIME_EXT, mimeType) ? ALLOWED_MIME_EXT[mimeType] : null;
     }
@@ -342,8 +361,47 @@
         }
     }
 
+    // 업로드/삭제와 달리 role 사전 확인을 하지 않는다. admin/manager/anon
+    // 모두 이 함수를 호출할 수 있으며, 실제로 그 경로를 읽을 권한이 있는지는
+    // storage.objects RLS(storage_artwork_assets_select_*)가 최종 판단한다.
+    // public URL이나 signed URL은 생성하지 않고, 항상 download()로 받은
+    // Blob만 반환한다.
+    async function downloadArtworkAsset(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, blob: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidAssetPath(path)) {
+            return { ok: false, blob: null, error: safeError('invalid_storage_path', '이미지 경로 정보가 올바르지 않습니다.') };
+        }
+
+        try {
+            var downloadResult = await client.storage.from('artwork-assets').download(path);
+
+            if (downloadResult.error || !downloadResult.data) {
+                return { ok: false, blob: null, error: safeError('download_failed', '이미지를 불러오지 못했습니다.') };
+            }
+
+            var blob = downloadResult.data;
+
+            if (!Object.prototype.hasOwnProperty.call(ALLOWED_MIME_EXT, blob.type)) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_image', '이미지 형식이 올바르지 않습니다.') };
+            }
+
+            if (!(blob.size > 0) || blob.size > MAX_FILE_SIZE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_image', '이미지 용량이 올바르지 않습니다.') };
+            }
+
+            return { ok: true, blob: blob, mimeType: blob.type, size: blob.size, error: null };
+        } catch (err) {
+            return { ok: false, blob: null, error: safeError('download_failed', '이미지 다운로드 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.storage = {
         uploadManagedArtworkImage: uploadManagedArtworkImage,
-        removeManagedArtworkAsset: removeManagedArtworkAsset
+        removeManagedArtworkAsset: removeManagedArtworkAsset,
+        downloadArtworkAsset: downloadArtworkAsset
     };
 })();
