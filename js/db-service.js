@@ -13,6 +13,25 @@
         return { code: code, message: message };
     }
 
+    // title로부터 안전한 slug를 만든다. 원본 title이나 개인정보를 console에
+    // 출력하지 않는다. 영문 소문자/숫자/한글/하이픈만 남기고, 끝에
+    // crypto.randomUUID()의 앞 8자를 붙여 처음부터 고유 가능성을 높인다.
+    function onhadaBuildExhibitionSlug(title) {
+        var normalized = (typeof title === 'string' ? title : '').normalize('NFKC').trim().toLowerCase();
+        normalized = normalized.replace(/\s+/g, '-');
+        normalized = normalized.replace(/[^a-z0-9가-힣-]/g, '');
+        normalized = normalized.replace(/-+/g, '-');
+        normalized = normalized.replace(/^-+|-+$/g, '');
+
+        if (!normalized) {
+            normalized = 'exhibition';
+        }
+
+        var base = normalized.slice(0, 60);
+        var suffix = crypto.randomUUID().slice(0, 8);
+        return base + '-' + suffix;
+    }
+
     function flattenRow(row) {
         const ex = row && row.exhibitions;
         if (!ex) return null;
@@ -711,6 +730,173 @@
         }
     }
 
+    // 관리자용 - public/private/demo 여부와 무관하게 내부 전시관 전체를
+    // 조회한다.
+    async function getExhibitionsForAdmin() {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, exhibitions: [], error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, exhibitions: [], error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, exhibitions: [], error: safeError('role_not_allowed', '전시관 조회는 관리자 계정만 가능합니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, exhibitions: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('exhibitions')
+                .select(`
+                    id,
+                    slug,
+                    legacy_id,
+                    title,
+                    description,
+                    tag,
+                    organization_name,
+                    cover_image_path,
+                    exhibition_type,
+                    operation_status,
+                    visibility,
+                    is_demo,
+                    is_external,
+                    allow_comments,
+                    start_date,
+                    end_date,
+                    created_at,
+                    updated_at
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                return { ok: false, exhibitions: [], error: safeError('exhibitions_fetch_failed', '전시관 목록을 불러오지 못했습니다.') };
+            }
+
+            return { ok: true, exhibitions: Array.isArray(data) ? data : [], error: null };
+        } catch (err) {
+            return { ok: false, exhibitions: [], error: safeError('unexpected_error', '전시관 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 관리자용 - 신규 내부 전시관을 생성한다. 생성 직후에는 항상
+    // private/preparing/non-demo/internal로 고정한다(운영자에게 공개 전환
+    // 권한을 주지 않는다는 원칙과 별개로, 이 함수 자체도 그 외 상태로는
+    // 절대 만들지 않는다). input을 그대로 스프레드하지 않고 화이트리스트
+    // 필드만 꺼내 검증한 뒤 payload를 내부에서 직접 구성한다.
+    async function createExhibitionAsAdmin(input) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, exhibition: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, exhibition: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, exhibition: null, error: safeError('role_not_allowed', '전시관 생성은 관리자 계정만 가능합니다.') };
+        }
+
+        if (!input || typeof input !== 'object') {
+            return { ok: false, exhibition: null, error: safeError('invalid_input', '입력값이 올바르지 않습니다.') };
+        }
+
+        const title = typeof input.title === 'string' ? input.title.trim() : '';
+        const descriptionTrimmed = typeof input.description === 'string' ? input.description.trim() : '';
+        const tagTrimmed = typeof input.tag === 'string' ? input.tag.trim() : '';
+        const organizationNameTrimmed = typeof input.organization_name === 'string' ? input.organization_name.trim() : '';
+        const exhibitionType = typeof input.exhibition_type === 'string' ? input.exhibition_type : '';
+        const allowComments = input.allow_comments === true;
+
+        if (!title || title.length > 100) {
+            return { ok: false, exhibition: null, error: safeError('invalid_title', '전시관 제목을 100자 이내로 입력해 주세요.') };
+        }
+
+        if (descriptionTrimmed.length > 1000) {
+            return { ok: false, exhibition: null, error: safeError('invalid_description', '전시관 설명은 1000자를 초과할 수 없습니다.') };
+        }
+
+        if (tagTrimmed.length > 50) {
+            return { ok: false, exhibition: null, error: safeError('invalid_tag', '태그는 50자를 초과할 수 없습니다.') };
+        }
+
+        if (organizationNameTrimmed.length > 100) {
+            return { ok: false, exhibition: null, error: safeError('invalid_organization_name', '기관명은 100자를 초과할 수 없습니다.') };
+        }
+
+        if (['institution', 'instructor', 'personal'].indexOf(exhibitionType) === -1) {
+            return { ok: false, exhibition: null, error: safeError('invalid_exhibition_type', '전시관 운영 형태를 선택해 주세요.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, exhibition: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+            return { ok: false, exhibition: null, error: safeError('client_unavailable', '이 브라우저에서는 전시관 생성을 사용할 수 없습니다.') };
+        }
+
+        function buildPayload() {
+            return {
+                slug: onhadaBuildExhibitionSlug(title),
+                title: title,
+                description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
+                tag: tagTrimmed.length > 0 ? tagTrimmed : null,
+                organization_name: organizationNameTrimmed.length > 0 ? organizationNameTrimmed : null,
+                exhibition_type: exhibitionType,
+                allow_comments: allowComments,
+                visibility: 'private',
+                operation_status: 'preparing',
+                is_demo: false,
+                is_external: false,
+                external_url: null,
+                cover_image_path: null
+            };
+        }
+
+        const selectFields = 'id, slug, title, description, tag, organization_name, exhibition_type, operation_status, visibility, is_demo, is_external, allow_comments, created_at';
+
+        try {
+            let payload = buildPayload();
+            let insertResult = await client
+                .from('exhibitions')
+                .insert(payload)
+                .select(selectFields)
+                .single();
+
+            if (insertResult.error && insertResult.error.code === '23505') {
+                // slug 충돌 - 새 UUID 접미사로 딱 1회만 재시도한다. 무한 재시도 금지.
+                payload = buildPayload();
+                insertResult = await client
+                    .from('exhibitions')
+                    .insert(payload)
+                    .select(selectFields)
+                    .single();
+            }
+
+            if (insertResult.error) {
+                return { ok: false, exhibition: null, error: safeError('exhibition_create_failed', '전시관 생성에 실패했습니다.') };
+            }
+
+            return { ok: true, exhibition: insertResult.data, error: null };
+        } catch (err) {
+            return { ok: false, exhibition: null, error: safeError('unexpected_error', '전시관 생성 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.db = {
         getMyManagedExhibitions: getMyManagedExhibitions,
         getManagedArtworks: getManagedArtworks,
@@ -721,6 +907,8 @@
         createManagedImageArtwork: createManagedImageArtwork,
         getPendingArtworksForAdmin: getPendingArtworksForAdmin,
         approveArtworkAsAdmin: approveArtworkAsAdmin,
-        rejectArtworkAsAdmin: rejectArtworkAsAdmin
+        rejectArtworkAsAdmin: rejectArtworkAsAdmin,
+        getExhibitionsForAdmin: getExhibitionsForAdmin,
+        createExhibitionAsAdmin: createExhibitionAsAdmin
     };
 })();
