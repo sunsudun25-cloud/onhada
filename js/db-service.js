@@ -195,6 +195,122 @@
         }
     }
 
+    // 인증 없이 호출 가능. RLS(exhibitions_select_public)가 최종 보안 경계이며,
+    // 여기서 붙이는 .eq() 조건은 프런트 표시 목적의 명시적 질의일 뿐 그 자체로
+    // 보안을 담보하지 않는다 - RLS가 없어도 이 조건이 그대로 강제된다고
+    // 가정하지 않는다.
+    async function getPublicExhibitions() {
+        const client = getClient();
+        if (!client) {
+            return { ok: false, exhibitions: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('exhibitions')
+                .select(`
+                    id,
+                    slug,
+                    legacy_id,
+                    title,
+                    tag,
+                    organization_name,
+                    cover_image_path,
+                    exhibition_type,
+                    is_demo,
+                    exhibition_stats (
+                        participant_count,
+                        artwork_count
+                    )
+                `)
+                .eq('visibility', 'public')
+                .eq('operation_status', 'operating');
+
+            if (error) {
+                return { ok: false, exhibitions: [], error: safeError('exhibitions_fetch_failed', '공개 전시관 목록을 불러오지 못했습니다.') };
+            }
+
+            return { ok: true, exhibitions: Array.isArray(data) ? data : [], error: null };
+        } catch (err) {
+            return { ok: false, exhibitions: [], error: safeError('unexpected_error', '공개 전시관 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 인증 없이 호출 가능. RLS(artworks_select_public)가 최종 보안 경계이지만,
+    // 이 함수는 "공개 관람객 전용"이라는 의미 자체를 호출자의 role과 무관하게
+    // 강제해야 한다. manager/admin으로 로그인한 상태에서 호출하면
+    // artworks_select_manager/admin RLS가 동시에 적용돼 RLS만으로는
+    // private/preparing 전시관의 작품까지 보일 수 있으므로, exhibitions를
+    // !inner로 조인해 status='approved' AND visibility='public' AND
+    // operation_status='operating'을 질의 조건에 명시적으로 강제한다.
+    // exhibitions!inner 없이 status='approved'만 걸면(이전 구현) 그 전시관
+    // 자체의 공개 여부는 검사하지 않게 되는 것이 문제였다.
+    async function getPublicArtworksForExhibition(exhibitionId) {
+        if (!exhibitionId) {
+            return { ok: false, artworks: [], error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artworks: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .select(`
+                    id,
+                    title,
+                    media_type,
+                    artist_display_name,
+                    category_id,
+                    thumbnail_url,
+                    media_url,
+                    description,
+                    poem,
+                    categories (
+                        id,
+                        name
+                    ),
+                    exhibitions!inner (
+                        visibility,
+                        operation_status
+                    )
+                `)
+                .eq('exhibition_id', exhibitionId)
+                .eq('status', 'approved')
+                .eq('exhibitions.visibility', 'public')
+                .eq('exhibitions.operation_status', 'operating');
+
+            if (error) {
+                return { ok: false, artworks: [], error: safeError('artworks_fetch_failed', '공개 작품 목록을 불러오지 못했습니다.') };
+            }
+
+            const rows = Array.isArray(data) ? data : [];
+
+            // exhibitions는 조인 필터링에만 사용하고, 반환 데이터에는 기존에
+            // 승인한 공개 작품 필드만 남긴다(전시관 내부 정보 제거).
+            const publicArtworks = rows.map(function (row) {
+                return {
+                    id: row.id,
+                    title: row.title,
+                    media_type: row.media_type,
+                    artist_display_name: row.artist_display_name,
+                    category_id: row.category_id,
+                    thumbnail_url: row.thumbnail_url,
+                    media_url: row.media_url,
+                    description: row.description,
+                    poem: row.poem,
+                    categories: row.categories
+                };
+            });
+
+            return { ok: true, artworks: publicArtworks, error: null };
+        } catch (err) {
+            return { ok: false, artworks: [], error: safeError('unexpected_error', '공개 작품 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
     async function createManagedArtwork(exhibitionId, input) {
         const client = getClient();
         if (!client) {
@@ -599,6 +715,8 @@
         getMyManagedExhibitions: getMyManagedExhibitions,
         getManagedArtworks: getManagedArtworks,
         getCategories: getCategories,
+        getPublicExhibitions: getPublicExhibitions,
+        getPublicArtworksForExhibition: getPublicArtworksForExhibition,
         createManagedArtwork: createManagedArtwork,
         createManagedImageArtwork: createManagedImageArtwork,
         getPendingArtworksForAdmin: getPendingArtworksForAdmin,
