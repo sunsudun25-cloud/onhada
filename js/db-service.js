@@ -173,8 +173,142 @@
         }
     }
 
+    async function getCategories() {
+        const client = getClient();
+        if (!client) {
+            return { ok: false, categories: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('categories')
+                .select('id, name')
+                .order('name', { ascending: true });
+
+            if (error) {
+                return { ok: false, categories: [], error: safeError('categories_fetch_failed', '카테고리 목록을 불러오지 못했습니다.') };
+            }
+
+            return { ok: true, categories: Array.isArray(data) ? data : [], error: null };
+        } catch (err) {
+            return { ok: false, categories: [], error: safeError('unexpected_error', '카테고리 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    async function createManagedArtwork(exhibitionId, input) {
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artwork: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        if (!exhibitionId) {
+            return { ok: false, artwork: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, artwork: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, artwork: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, artwork: null, error: safeError('role_not_allowed', '작품 등록은 운영자 계정만 가능합니다.') };
+        }
+
+        const managedResult = await getMyManagedExhibitions();
+
+        if (!managedResult.ok) {
+            return { ok: false, artwork: null, error: managedResult.error };
+        }
+
+        const isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionId; });
+
+        if (!isManaged) {
+            return { ok: false, artwork: null, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        // input을 그대로 스프레드하지 않고 화이트리스트 필드만 꺼낸다.
+        const safeInput = input || {};
+        const title = typeof safeInput.title === 'string' ? safeInput.title.trim() : '';
+        const artistDisplayName = typeof safeInput.artist_display_name === 'string' ? safeInput.artist_display_name.trim() : '';
+        const categoryId = typeof safeInput.category_id === 'string' ? safeInput.category_id : '';
+        const descriptionTrimmed = typeof safeInput.description === 'string' ? safeInput.description.trim() : '';
+        const poem = typeof safeInput.poem === 'string' ? safeInput.poem.trim() : '';
+        const consentConfirmed = safeInput.consent_confirmed === true;
+
+        const categoriesResult = await getCategories();
+
+        if (!categoriesResult.ok) {
+            return { ok: false, artwork: null, error: categoriesResult.error };
+        }
+
+        const categoryExists = categoriesResult.categories.some(function (cat) { return cat.id === categoryId; });
+
+        if (!categoryExists) {
+            return { ok: false, artwork: null, error: safeError('invalid_category', '카테고리를 선택해 주세요.') };
+        }
+
+        if (!title || title.length > 100) {
+            return { ok: false, artwork: null, error: safeError('invalid_title', '작품명을 100자 이내로 입력해 주세요.') };
+        }
+
+        if (!artistDisplayName || artistDisplayName.length > 50) {
+            return { ok: false, artwork: null, error: safeError('invalid_artist_display_name', '작가 표시명을 50자 이내로 입력해 주세요.') };
+        }
+
+        if (descriptionTrimmed.length > 500) {
+            return { ok: false, artwork: null, error: safeError('invalid_description', '작품 설명은 500자를 초과할 수 없습니다.') };
+        }
+
+        if (!poem || poem.length > 2000) {
+            return { ok: false, artwork: null, error: safeError('invalid_poem', '글/시 내용을 2000자 이내로 입력해 주세요.') };
+        }
+
+        // UI 체크박스를 우회하더라도 여기서 다시 한번 동의 여부를 강제한다.
+        if (!consentConfirmed) {
+            return { ok: false, artwork: null, error: safeError('consent_required', '전시 동의 확인이 필요합니다.') };
+        }
+
+        const payload = {
+            exhibition_id: exhibitionId,
+            category_id: categoryId,
+            title: title,
+            media_type: 'text',
+            artist_display_name: artistDisplayName,
+            description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
+            poem: poem,
+            status: 'pending',
+            consent_confirmed: true,
+            consent_scope: 'online_exhibition_confirmed_by_operator',
+            submitted_by: context.userId
+        };
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .insert(payload)
+                .select('id, exhibition_id, category_id, title, media_type, artist_display_name, status, consent_confirmed, created_at')
+                .single();
+
+            if (error) {
+                return { ok: false, artwork: null, error: safeError('artwork_create_failed', '작품 등록에 실패했습니다.') };
+            }
+
+            return { ok: true, artwork: data, error: null };
+        } catch (err) {
+            return { ok: false, artwork: null, error: safeError('unexpected_error', '작품 등록 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.db = {
         getMyManagedExhibitions: getMyManagedExhibitions,
-        getManagedArtworks: getManagedArtworks
+        getManagedArtworks: getManagedArtworks,
+        getCategories: getCategories,
+        createManagedArtwork: createManagedArtwork
     };
 })();

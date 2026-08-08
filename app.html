@@ -2777,6 +2777,36 @@
           <p id="onhada-manager-artworks-status" style="color:var(--text-gray); font-size:0.9rem; margin-bottom:20px;"></p>
           <div id="onhada-manager-artworks-list"></div>
         </div>
+
+        <div id="onhada-manager-artwork-section" style="display:none; margin-top: 30px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px;">
+          <h3 style="color:#fff; margin-bottom:6px;">텍스트 작품 등록</h3>
+          <p id="onhada-manager-artwork-target" style="color:var(--text-gray); font-size:0.85rem; margin-bottom:16px;"></p>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작품명</label>
+          <input type="text" id="onhada-manager-artwork-title" class="form-control" maxlength="100" style="margin-bottom:14px;">
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작가 표시명</label>
+          <input type="text" id="onhada-manager-artwork-author" class="form-control" maxlength="50" style="margin-bottom:14px;">
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">카테고리</label>
+          <select id="onhada-manager-artwork-category" class="form-control" style="margin-bottom:14px;">
+            <option value="" style="background: #090916; color: #fff;">카테고리를 선택하세요</option>
+          </select>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작품 설명</label>
+          <textarea id="onhada-manager-artwork-description" class="form-control" maxlength="500" rows="3" style="margin-bottom:14px; resize:vertical;"></textarea>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">글/시 내용</label>
+          <textarea id="onhada-manager-artwork-poem" class="form-control" maxlength="2000" rows="4" style="margin-bottom:14px; resize:vertical;"></textarea>
+
+          <label style="color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; cursor:pointer;">
+            <input type="checkbox" id="onhada-manager-artwork-consent" onchange="onhadaUpdateArtworkSubmitState()" style="margin-top:3px;">
+            <span>작가 또는 보호자에게 온라인 전시 및 작품 공개 동의를 확인했습니다.</span>
+          </label>
+
+          <button class="btn-hero-primary" id="onhada-manager-artwork-submit" onclick="onhadaSubmitManagedArtwork()" style="width:100%;" disabled>작품 등록</button>
+          <p id="onhada-manager-artwork-status" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px;"></p>
+        </div>
       </div>
 
       <!-- ============================================== -->
@@ -3098,9 +3128,9 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 세 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-1"></script>
-  <script src="js/auth-service.js?v=20260808-1"></script>
-  <script src="js/db-service.js?v=20260808-1"></script>
+  <script src="js/supabase-client.js?v=20260808-3"></script>
+  <script src="js/auth-service.js?v=20260808-3"></script>
+  <script src="js/db-service.js?v=20260808-3"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4097,6 +4127,8 @@
     let currentOperatorContext = null;
     let currentManagedExhibitions = [];
     let currentManagedExhibitionId = null;
+    let currentManagerCategories = null;
+    let onhadaCategoriesLoadPromise = null;
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
@@ -4271,7 +4303,142 @@
         statusEl.textContent = (found.title || '해당') + " 전시관이 선택되었습니다. 작품 관리는 다음 단계에서 연결됩니다.";
       }
 
+      onhadaResetManagedArtworkForm(found);
       renderManagedArtworks(exhibitionId);
+    }
+
+    // 전시관을 선택/변경할 때마다 등록 폼을 새 전시관 기준으로 초기화한다.
+    // 이전 전시관에 입력하던 내용이 다른 전시관으로 잘못 제출되는 것을 막는다.
+    function onhadaResetManagedArtworkForm(exhibition) {
+      const sectionEl = document.getElementById('onhada-manager-artwork-section');
+      const targetEl = document.getElementById('onhada-manager-artwork-target');
+      const titleEl = document.getElementById('onhada-manager-artwork-title');
+      const authorEl = document.getElementById('onhada-manager-artwork-author');
+      const categoryEl = document.getElementById('onhada-manager-artwork-category');
+      const descriptionEl = document.getElementById('onhada-manager-artwork-description');
+      const poemEl = document.getElementById('onhada-manager-artwork-poem');
+      const consentEl = document.getElementById('onhada-manager-artwork-consent');
+      const artworkStatusEl = document.getElementById('onhada-manager-artwork-status');
+
+      if (sectionEl) sectionEl.style.display = 'block';
+      if (targetEl) targetEl.textContent = (exhibition && exhibition.title ? exhibition.title : '전시관') + '에 텍스트 작품을 등록합니다.';
+      if (titleEl) titleEl.value = "";
+      if (authorEl) authorEl.value = "";
+      if (categoryEl) categoryEl.value = "";
+      if (descriptionEl) descriptionEl.value = "";
+      if (poemEl) poemEl.value = "";
+      if (consentEl) consentEl.checked = false;
+      if (artworkStatusEl) artworkStatusEl.textContent = "";
+
+      onhadaLoadManagerCategories();
+      onhadaUpdateArtworkSubmitState();
+    }
+
+    // 카테고리 목록을 최초 1회만 불러온다. 이미 불러왔거나 요청이 진행
+    // 중이면 그 결과/진행 중인 요청을 그대로 재사용해 중복 호출을 막는다.
+    async function onhadaLoadManagerCategories() {
+      if (currentManagerCategories) return currentManagerCategories;
+      if (onhadaCategoriesLoadPromise) return onhadaCategoriesLoadPromise;
+
+      onhadaCategoriesLoadPromise = (async () => {
+        const artworkStatusEl = document.getElementById('onhada-manager-artwork-status');
+        const categorySelect = document.getElementById('onhada-manager-artwork-category');
+
+        const result = await window.ONHADA_BACKEND.db.getCategories();
+
+        if (!result.ok) {
+          // 실패를 캐시하지 않는다 - []는 truthy라 여기 저장하면 다음 호출의
+          // "이미 불러왔음" 판정(위 currentManagerCategories 체크)에 걸려
+          // 재조회가 영원히 차단된다. null로 두어야 다음 전시관 선택 시
+          // 다시 시도할 수 있다.
+          currentManagerCategories = null;
+          if (artworkStatusEl) {
+            artworkStatusEl.textContent = (result.error && result.error.message) || "카테고리 정보를 불러오지 못해 등록할 수 없습니다.";
+          }
+        } else {
+          currentManagerCategories = result.categories;
+          if (categorySelect) {
+            currentManagerCategories.forEach(cat => {
+              const option = document.createElement('option');
+              option.value = cat.id;
+              option.textContent = cat.name;
+              // 다크 테마 배경에서 옵션 목록이 브라우저 기본(흰색) 배경으로
+              // 렌더링되는 문제를 막기 위해 배경/글자색을 명시한다
+              // (user-role-select의 옵션과 동일한 방식).
+              option.style.background = '#090916';
+              option.style.color = '#fff';
+              categorySelect.appendChild(option);
+            });
+          }
+        }
+
+        onhadaUpdateArtworkSubmitState();
+        onhadaCategoriesLoadPromise = null;
+        return currentManagerCategories;
+      })();
+
+      return onhadaCategoriesLoadPromise;
+    }
+
+    // 카테고리가 정상적으로 로드됐고, 동의 체크박스가 선택된 경우에만
+    // 제출 버튼을 활성화한다.
+    function onhadaUpdateArtworkSubmitState() {
+      const submitBtn = document.getElementById('onhada-manager-artwork-submit');
+      const consentEl = document.getElementById('onhada-manager-artwork-consent');
+      if (!submitBtn) return;
+
+      const categoriesReady = Array.isArray(currentManagerCategories) && currentManagerCategories.length > 0;
+      const consentChecked = !!(consentEl && consentEl.checked);
+
+      submitBtn.disabled = !(categoriesReady && consentChecked);
+    }
+
+    async function onhadaSubmitManagedArtwork() {
+      if (!currentManagedExhibitionId) return;
+
+      const submitBtn = document.getElementById('onhada-manager-artwork-submit');
+      const statusEl = document.getElementById('onhada-manager-artwork-status');
+      const titleEl = document.getElementById('onhada-manager-artwork-title');
+      const authorEl = document.getElementById('onhada-manager-artwork-author');
+      const categoryEl = document.getElementById('onhada-manager-artwork-category');
+      const descriptionEl = document.getElementById('onhada-manager-artwork-description');
+      const poemEl = document.getElementById('onhada-manager-artwork-poem');
+      const consentEl = document.getElementById('onhada-manager-artwork-consent');
+
+      if (submitBtn) submitBtn.disabled = true;
+      if (statusEl) statusEl.textContent = "작품을 등록하는 중입니다...";
+
+      try {
+        const input = {
+          title: titleEl ? titleEl.value : '',
+          artist_display_name: authorEl ? authorEl.value : '',
+          category_id: categoryEl ? categoryEl.value : '',
+          description: descriptionEl ? descriptionEl.value : '',
+          poem: poemEl ? poemEl.value : '',
+          consent_confirmed: !!(consentEl && consentEl.checked)
+        };
+
+        const result = await window.ONHADA_BACKEND.db.createManagedArtwork(currentManagedExhibitionId, input);
+
+        if (!result.ok) {
+          // 실패 시 사용자가 입력한 내용은 그대로 유지한다.
+          if (statusEl) statusEl.textContent = (result.error && result.error.message) || "작품 등록에 실패했습니다.";
+          return;
+        }
+
+        if (titleEl) titleEl.value = "";
+        if (authorEl) authorEl.value = "";
+        if (categoryEl) categoryEl.value = "";
+        if (descriptionEl) descriptionEl.value = "";
+        if (poemEl) poemEl.value = "";
+        if (consentEl) consentEl.checked = false;
+
+        if (statusEl) statusEl.textContent = "작품이 승인 대기 상태로 등록되었습니다.";
+
+        renderManagedArtworks(currentManagedExhibitionId);
+      } finally {
+        onhadaUpdateArtworkSubmitState();
+      }
     }
 
     // renderAllViews()에는 포함하지 않는다 - 전시관 "선택" 버튼을 눌렀을
