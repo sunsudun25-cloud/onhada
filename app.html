@@ -2771,6 +2771,12 @@
         <p id="onhada-manager-status" style="color:var(--text-gray); font-size:0.9rem; margin-bottom:20px;"></p>
 
         <div id="onhada-manager-exhibitions" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;"></div>
+
+        <div id="onhada-manager-artworks-section" style="display:none; margin-top: 30px;">
+          <h3 id="onhada-manager-artworks-title" style="color:#fff; margin-bottom:10px;">작품 목록</h3>
+          <p id="onhada-manager-artworks-status" style="color:var(--text-gray); font-size:0.9rem; margin-bottom:20px;"></p>
+          <div id="onhada-manager-artworks-list"></div>
+        </div>
       </div>
 
       <!-- ============================================== -->
@@ -3091,9 +3097,10 @@
   <!-- [Supabase 백엔드 연동] -->
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-client.js"></script>
-  <script src="js/auth-service.js"></script>
-  <script src="js/db-service.js"></script>
+  <!-- 아래 세 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
+  <script src="js/supabase-client.js?v=20260808-1"></script>
+  <script src="js/auth-service.js?v=20260808-1"></script>
+  <script src="js/db-service.js?v=20260808-1"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4228,6 +4235,31 @@
       return '공개 범위 미확인';
     }
 
+    function onhadaArtworkStatusLabel(status) {
+      if (status === 'pending') return '승인 대기';
+      if (status === 'approved') return '승인 완료';
+      if (status === 'rejected') return '반려';
+      if (status === 'hidden') return '숨김';
+      return '상태 미확인';
+    }
+
+    function onhadaMediaTypeLabel(mediaType) {
+      if (mediaType === 'image') return '이미지';
+      if (mediaType === 'video') return '영상';
+      if (mediaType === 'audio') return '오디오';
+      if (mediaType === 'text') return '글';
+      if (mediaType === 'document') return '문서';
+      if (mediaType === 'mixed') return '복합 창작';
+      return '유형 미확인';
+    }
+
+    function onhadaFormatDate(value) {
+      if (!value) return '날짜 미확인';
+      const parsed = new Date(value);
+      if (isNaN(parsed.getTime())) return '날짜 미확인';
+      return parsed.toLocaleDateString('ko-KR');
+    }
+
     function onhadaSelectManagedExhibition(exhibitionId) {
       const found = currentManagedExhibitions.find(ex => ex.id === exhibitionId);
       if (!found) return;
@@ -4238,6 +4270,92 @@
       if (statusEl) {
         statusEl.textContent = (found.title || '해당') + " 전시관이 선택되었습니다. 작품 관리는 다음 단계에서 연결됩니다.";
       }
+
+      renderManagedArtworks(exhibitionId);
+    }
+
+    // renderAllViews()에는 포함하지 않는다 - 전시관 "선택" 버튼을 눌렀을
+    // 때만 명시적으로 호출한다.
+    async function renderManagedArtworks(exhibitionId) {
+      const sectionEl = document.getElementById('onhada-manager-artworks-section');
+      const titleEl = document.getElementById('onhada-manager-artworks-title');
+      const statusEl = document.getElementById('onhada-manager-artworks-status');
+      const listEl = document.getElementById('onhada-manager-artworks-list');
+
+      const selectedExhibition = currentManagedExhibitions.find(ex => ex.id === exhibitionId);
+
+      if (sectionEl) sectionEl.style.display = 'block';
+      if (titleEl) titleEl.textContent = (selectedExhibition && selectedExhibition.title ? selectedExhibition.title : '전시관') + ' 작품 목록';
+      if (listEl) listEl.innerHTML = "";
+      if (statusEl) statusEl.textContent = "작품 목록을 불러오는 중입니다...";
+
+      const result = await window.ONHADA_BACKEND.db.getManagedArtworks(exhibitionId);
+
+      // stale 응답 가드: 응답이 오는 사이 다른 전시관이 선택됐으면 반영하지 않는다.
+      if (currentManagedExhibitionId !== exhibitionId) return;
+
+      if (!result.ok) {
+        if (statusEl) statusEl.textContent = (result.error && result.error.message) || "작품 목록을 불러오지 못했습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      const artworks = result.artworks;
+
+      if (artworks.length === 0) {
+        if (statusEl) statusEl.textContent = "등록된 작품이 없습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `작품 ${artworks.length}건`;
+      if (listEl) listEl.innerHTML = "";
+
+      artworks.forEach(art => {
+        const row = document.createElement('div');
+        row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
+
+        const titleRow = document.createElement('h4');
+        titleRow.style.cssText = "color:#fff; margin-bottom:6px;";
+        titleRow.textContent = art.title || '(제목 없음)';
+        row.appendChild(titleRow);
+
+        const authorEl = document.createElement('p');
+        authorEl.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:8px;";
+        authorEl.textContent = art.artist_display_name || '작가 미상';
+        row.appendChild(authorEl);
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;";
+
+        const categoryName = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
+
+        [categoryName, onhadaMediaTypeLabel(art.media_type), onhadaArtworkStatusLabel(art.status)].forEach(labelText => {
+          const badge = document.createElement('span');
+          badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+          badge.textContent = labelText;
+          badgeRow.appendChild(badge);
+        });
+
+        const consentBadge = document.createElement('span');
+        if (art.consent_confirmed) {
+          consentBadge.style.cssText = "background: rgba(16,185,129,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: #10b981;";
+          consentBadge.textContent = "전시 동의 확인";
+        } else {
+          consentBadge.style.cssText = "background: rgba(239,68,68,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: #ef4444;";
+          consentBadge.textContent = "전시 동의 미확인";
+        }
+        badgeRow.appendChild(consentBadge);
+
+        row.appendChild(badgeRow);
+
+        const dateEl = document.createElement('p');
+        dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem;";
+        dateEl.textContent = onhadaFormatDate(art.created_at);
+        row.appendChild(dateEl);
+
+        if (listEl) listEl.appendChild(row);
+      });
     }
 
     // renderAllViews()에는 포함하지 않는다 - manager 로그인 성공 또는

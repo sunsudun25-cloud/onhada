@@ -103,7 +103,78 @@
         }
     }
 
+    async function getManagedArtworks(exhibitionId) {
+        if (!exhibitionId) {
+            return { ok: false, artworks: [], error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, artworks: [], error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, artworks: [], error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, artworks: [], error: safeError('role_not_allowed', '작품 조회는 운영자 계정만 가능합니다.') };
+        }
+
+        const managedResult = await getMyManagedExhibitions();
+
+        if (!managedResult.ok) {
+            return { ok: false, artworks: [], error: managedResult.error };
+        }
+
+        const isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionId; });
+
+        if (!isManaged) {
+            return { ok: false, artworks: [], error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artworks: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .select(`
+                    id,
+                    exhibition_id,
+                    title,
+                    category_id,
+                    media_type,
+                    artist_display_name,
+                    status,
+                    consent_confirmed,
+                    created_at,
+                    categories (
+                        id,
+                        name
+                    )
+                `)
+                .eq('exhibition_id', exhibitionId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                return { ok: false, artworks: [], error: safeError('artworks_fetch_failed', '작품 목록을 불러오지 못했습니다.') };
+            }
+
+            const rows = Array.isArray(data) ? data : [];
+
+            return { ok: true, artworks: rows, error: null };
+        } catch (err) {
+            return { ok: false, artworks: [], error: safeError('unexpected_error', '작품 목록 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.db = {
-        getMyManagedExhibitions: getMyManagedExhibitions
+        getMyManagedExhibitions: getMyManagedExhibitions,
+        getManagedArtworks: getManagedArtworks
     };
 })();
