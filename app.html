@@ -2855,6 +2855,7 @@
           <button class="sub-tab-btn active" onclick="switchSubTab('admin', 'a-stats')">성과 자료 관리</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-approve')">작품 승인/반려</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-create-hall')">전시관 만들기</button>
+          <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-cloud-exhibitions'); renderAdminCloudExhibitions();">클라우드 전시관 관리</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-create-exhibit')">전시회 만들기</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-students')">수강생 등록</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-qr')">QR코드 생성</button>
@@ -2941,6 +2942,63 @@
               <textarea id="hall-form-desc" class="form-control" rows="3" placeholder="전시관의 설립 의미와 전시 주제를 간략히 입력하세요."></textarea>
             </div>
             <button class="btn-run-coach" onclick="submitCreateHall()">전시관 즉각 개설 승인</button>
+          </div>
+        </div>
+
+        <!-- 3-1. 클라우드 전시관 관리 (Supabase 내부 전시관 - 기존 localStorage
+             "전시관 만들기"와 완전히 분리된 신규 기능) -->
+        <div id="sub-admin-a-cloud-exhibitions" class="sub-tab-content">
+          <div style="background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.25); border-radius: 16px; padding: 18px; margin-bottom: 24px;">
+            <p style="color:#fff; font-size:0.9rem; margin-bottom:6px;">새 전시관은 비공개·준비 중 상태로 생성됩니다.</p>
+            <p style="color:#fff; font-size:0.9rem; margin-bottom:6px;">한 전시관에 디카시, 이미지, 글, 영상 등 여러 작품을 함께 등록할 수 있습니다.</p>
+            <p style="color:#fff; font-size:0.9rem;">공개 전환은 별도의 관리자 검토 후 진행합니다.</p>
+          </div>
+
+          <div class="coach-control-panel" style="max-width:600px; margin-bottom:30px;">
+            <h3 style="color:#fff; margin-bottom:20px;">새 전시관 만들기</h3>
+            <form id="onhada-admin-exhibition-form" onsubmit="onhadaSubmitAdminExhibition(event); return false;">
+              <div class="form-group">
+                <label class="form-label">전시관 유형</label>
+                <select id="onhada-admin-exhibition-type" class="form-control" onchange="onhadaUpdateAdminExhibitionNamePreview()">
+                  <option value="" style="background:#090916; color:#fff;">유형을 선택하세요</option>
+                  <option value="institution" style="background:#090916; color:#fff;">기관형</option>
+                  <option value="instructor" style="background:#090916; color:#fff;">강사형</option>
+                  <option value="personal" style="background:#090916; color:#fff;">개인형</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">뒤에 붙을 이름</label>
+                <input type="text" id="onhada-admin-exhibition-name-suffix" class="form-control" maxlength="60" placeholder="유형을 먼저 선택하세요" oninput="onhadaUpdateAdminExhibitionNamePreview()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">최종 전시관 이름</label>
+                <p id="onhada-admin-exhibition-name-preview" style="color:#fff; font-size:1rem; font-weight:700; background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px; margin:0;">유형과 이름을 입력하면 여기에 표시됩니다.</p>
+              </div>
+              <p style="color:var(--text-gray); font-size:0.85rem; margin-bottom:20px;">기관명과 운영자 정보는 운영자 배정 후 입력합니다.</p>
+              <div class="form-group">
+                <label class="form-label">대표 태그</label>
+                <input type="text" id="onhada-admin-exhibition-tag" class="form-control" maxlength="50" placeholder="예: AI 이미지">
+              </div>
+              <div class="form-group">
+                <label class="form-label">전시관 소개</label>
+                <textarea id="onhada-admin-exhibition-description" class="form-control" rows="3" maxlength="1000" placeholder="전시관 소개를 입력하세요."></textarea>
+              </div>
+              <label style="color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; cursor:pointer;">
+                <input type="checkbox" id="onhada-admin-exhibition-allow-comments" style="margin-top:3px;">
+                <span>댓글 허용</span>
+              </label>
+              <button type="submit" class="btn-run-coach" id="onhada-admin-exhibition-submit">전시관 생성</button>
+              <p id="onhada-admin-exhibition-status" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px;"></p>
+            </form>
+          </div>
+
+          <div class="admin-table-container">
+            <div class="admin-table-title">
+              <span>클라우드 전시관 목록</span>
+              <button class="btn-hero-secondary" id="onhada-admin-exhibition-refresh" onclick="renderAdminCloudExhibitions()" style="font-size: 0.8rem;">새로고침</button>
+            </div>
+            <p id="onhada-admin-exhibition-list-status" style="color:var(--text-gray); font-size:0.9rem; margin: 10px 0;"></p>
+            <div id="onhada-admin-exhibition-list"></div>
           </div>
         </div>
 
@@ -3182,10 +3240,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-10"></script>
-  <script src="js/auth-service.js?v=20260808-10"></script>
-  <script src="js/db-service.js?v=20260808-10"></script>
-  <script src="js/storage-service.js?v=20260808-10"></script>
+  <script src="js/supabase-client.js?v=20260808-11"></script>
+  <script src="js/auth-service.js?v=20260808-11"></script>
+  <script src="js/db-service.js?v=20260808-11"></script>
+  <script src="js/storage-service.js?v=20260808-11"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4563,6 +4621,8 @@
     let activeSupabaseExhibitionId = null;
     let onhadaPublicArtworksRequestSeq = 0;
     let onhadaPublicArtworkBlobUrls = new Map();
+    let onhadaAdminExhibitions = [];
+    let onhadaAdminExhibitionsRequestSeq = 0;
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
@@ -4703,6 +4763,16 @@
       if (visibility === 'unlisted') return '링크 공개';
       if (visibility === 'private') return '비공개';
       return '공개 범위 미확인';
+    }
+
+    // 클라우드 전시관 관리 탭의 select 옵션 표기와 동일한 문구를 쓰기 위해
+    // 기존 onhadaExhibitionTypeLabel()과는 별도로 둔다("기관 전시관" 등이
+    // 아니라 "기관형" 등 짧은 표기가 필요).
+    function onhadaAdminExhibitionTypeLabel(exhibitionType) {
+      if (exhibitionType === 'institution') return '기관형';
+      if (exhibitionType === 'instructor') return '강사형';
+      if (exhibitionType === 'personal') return '개인형';
+      return '유형 미확인';
     }
 
     function onhadaArtworkStatusLabel(status) {
@@ -5386,6 +5456,298 @@
     window.addEventListener('beforeunload', function () {
       onhadaRevokeCloudPreviewUrls();
     });
+
+    // 확정된 전시관 명명 규칙 - exhibition_type별 고정 접두어.
+    const ONHADA_EXHIBITION_TYPE_PREFIX = {
+      institution: '온하다 예술관',
+      instructor: '온하다 창작관',
+      personal: '온하다 미래관'
+    };
+
+    function onhadaAdminExhibitionNameSuffixPlaceholder(exhibitionType) {
+      if (exhibitionType === 'institution') return '예) 동래';
+      if (exhibitionType === 'instructor') return '예) 동래 회상음악';
+      if (exhibitionType === 'personal') return '예) 순자의 봄';
+      return '유형을 먼저 선택하세요';
+    }
+
+    function onhadaUpdateAdminExhibitionNamePreview() {
+      const typeEl = document.getElementById('onhada-admin-exhibition-type');
+      const suffixEl = document.getElementById('onhada-admin-exhibition-name-suffix');
+      const previewEl = document.getElementById('onhada-admin-exhibition-name-preview');
+      if (!typeEl || !suffixEl || !previewEl) return;
+
+      const exhibitionType = typeEl.value;
+      suffixEl.placeholder = onhadaAdminExhibitionNameSuffixPlaceholder(exhibitionType);
+
+      const prefix = ONHADA_EXHIBITION_TYPE_PREFIX[exhibitionType];
+      const suffix = suffixEl.value.trim();
+
+      if (!prefix || !suffix) {
+        previewEl.textContent = '유형과 이름을 입력하면 여기에 표시됩니다.';
+        return;
+      }
+
+      previewEl.textContent = prefix + ' · ' + suffix;
+    }
+
+    // 이 클라이언트 중복 검사는 UX용 사전 방어일 뿐이다. 진짜 동시성
+    // 충돌(다른 관리자가 동시에 같은 이름으로 생성하는 등)에 대한 최종
+    // 방어는 DB 수준 제약(예: title/slug UNIQUE 인덱스)이 담당해야 하며,
+    // 그 제약은 별도 마이그레이션으로 추가할 예정이다.
+    function onhadaNormalizeExhibitionTitleForCompare(title) {
+      return (typeof title === 'string' ? title : '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/\s*·\s*/g, '·')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function onhadaResetAdminExhibitionForm() {
+      const typeEl = document.getElementById('onhada-admin-exhibition-type');
+      const suffixEl = document.getElementById('onhada-admin-exhibition-name-suffix');
+      const tagEl = document.getElementById('onhada-admin-exhibition-tag');
+      const descEl = document.getElementById('onhada-admin-exhibition-description');
+      const commentsEl = document.getElementById('onhada-admin-exhibition-allow-comments');
+      const statusEl = document.getElementById('onhada-admin-exhibition-status');
+
+      if (typeEl) typeEl.value = "";
+      if (suffixEl) suffixEl.value = "";
+      if (tagEl) tagEl.value = "";
+      if (descEl) descEl.value = "";
+      if (commentsEl) commentsEl.checked = false;
+      if (statusEl) statusEl.textContent = "";
+
+      onhadaUpdateAdminExhibitionNamePreview();
+    }
+
+    // renderAllViews()에는 포함하지 않는다 - "클라우드 전시관 관리" 탭을
+    // 열 때만 명시적으로 호출한다.
+    async function renderAdminCloudExhibitions() {
+      if (!isAdminAuthenticated) return;
+
+      const statusEl = document.getElementById('onhada-admin-exhibition-list-status');
+      const listEl = document.getElementById('onhada-admin-exhibition-list');
+
+      onhadaAdminExhibitionsRequestSeq += 1;
+      const requestSeq = onhadaAdminExhibitionsRequestSeq;
+
+      if (statusEl) statusEl.textContent = "클라우드 전시관 목록을 불러오는 중입니다...";
+      if (listEl) listEl.innerHTML = "";
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getExhibitionsForAdmin();
+      } catch (err) {
+        result = { ok: false, exhibitions: [], error: { code: 'unexpected_error', message: '클라우드 전시관 목록을 불러오지 못했습니다.' } };
+      }
+
+      // stale 응답 가드: 응답이 오는 사이 새 요청이 시작됐으면 이 결과는 버린다.
+      if (requestSeq !== onhadaAdminExhibitionsRequestSeq) return;
+
+      if (!result.ok) {
+        onhadaAdminExhibitions = [];
+        if (statusEl) statusEl.textContent = (result.error && result.error.message) || "클라우드 전시관 목록을 불러오지 못했습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      const exhibitions = result.exhibitions;
+      onhadaAdminExhibitions = exhibitions;
+
+      if (exhibitions.length === 0) {
+        if (statusEl) statusEl.textContent = "아직 생성된 클라우드 전시관이 없습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `클라우드 전시관 ${exhibitions.length}건`;
+      if (listEl) listEl.innerHTML = "";
+
+      exhibitions.forEach(ex => {
+        const row = document.createElement('div');
+        row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
+
+        const titleEl = document.createElement('h4');
+        titleEl.style.cssText = "color:#fff; margin-bottom:6px;";
+        titleEl.textContent = ex.title || '(제목 없음)';
+        row.appendChild(titleEl);
+
+        const orgEl = document.createElement('p');
+        orgEl.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:8px;";
+        orgEl.textContent = ex.organization_name || '기관/운영자 미확인';
+        row.appendChild(orgEl);
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;";
+
+        [
+          onhadaAdminExhibitionTypeLabel(ex.exhibition_type),
+          onhadaOperationStatusLabel(ex.operation_status),
+          onhadaVisibilityLabel(ex.visibility)
+        ].forEach(labelText => {
+          const badge = document.createElement('span');
+          badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+          badge.textContent = labelText;
+          badgeRow.appendChild(badge);
+        });
+
+        if (ex.tag) {
+          const tagBadge = document.createElement('span');
+          tagBadge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+          tagBadge.textContent = ex.tag;
+          badgeRow.appendChild(tagBadge);
+        }
+
+        row.appendChild(badgeRow);
+
+        const commentsEl = document.createElement('p');
+        commentsEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-bottom:6px;";
+        commentsEl.textContent = "댓글 허용: " + (ex.allow_comments ? "허용" : "미허용");
+        row.appendChild(commentsEl);
+
+        const dateEl = document.createElement('p');
+        dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem;";
+        dateEl.textContent = "생성일: " + onhadaFormatDate(ex.created_at);
+        row.appendChild(dateEl);
+
+        if (listEl) listEl.appendChild(row);
+      });
+    }
+
+    async function onhadaSubmitAdminExhibition(event) {
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+
+      if (!isAdminAuthenticated) return;
+
+      const submitBtn = document.getElementById('onhada-admin-exhibition-submit');
+      const statusEl = document.getElementById('onhada-admin-exhibition-status');
+      const typeEl = document.getElementById('onhada-admin-exhibition-type');
+      const suffixEl = document.getElementById('onhada-admin-exhibition-name-suffix');
+      const tagEl = document.getElementById('onhada-admin-exhibition-tag');
+      const descEl = document.getElementById('onhada-admin-exhibition-description');
+      const commentsEl = document.getElementById('onhada-admin-exhibition-allow-comments');
+
+      const exhibitionType = typeEl ? typeEl.value : '';
+      const rawSuffix = suffixEl ? suffixEl.value : '';
+      const tag = tagEl ? tagEl.value.trim() : '';
+      const description = descEl ? descEl.value.trim() : '';
+      const allowComments = !!(commentsEl && commentsEl.checked);
+
+      if (['institution', 'instructor', 'personal'].indexOf(exhibitionType) === -1) {
+        if (statusEl) statusEl.textContent = "전시관 유형을 선택해 주세요.";
+        return;
+      }
+
+      if (rawSuffix.indexOf('\n') !== -1 || rawSuffix.indexOf('\r') !== -1) {
+        if (statusEl) statusEl.textContent = "이름에는 줄바꿈을 사용할 수 없습니다.";
+        return;
+      }
+
+      const suffix = rawSuffix.trim();
+
+      if (!suffix) {
+        if (statusEl) statusEl.textContent = "뒤에 붙을 이름을 입력해 주세요.";
+        return;
+      }
+
+      if (suffix.length > 60) {
+        if (statusEl) statusEl.textContent = "뒤에 붙을 이름은 60자를 초과할 수 없습니다.";
+        return;
+      }
+
+      if (suffix.indexOf('·') !== -1) {
+        if (statusEl) statusEl.textContent = "이름에 구분점(·)을 직접 입력할 수 없습니다.";
+        return;
+      }
+
+      if (tag.length > 50) {
+        if (statusEl) statusEl.textContent = "대표 태그는 50자를 초과할 수 없습니다.";
+        return;
+      }
+
+      if (description.length > 1000) {
+        if (statusEl) statusEl.textContent = "전시관 소개는 1000자를 초과할 수 없습니다.";
+        return;
+      }
+
+      const prefix = ONHADA_EXHIBITION_TYPE_PREFIX[exhibitionType];
+      const finalTitle = prefix + ' · ' + suffix;
+      const normalizedFinalTitle = onhadaNormalizeExhibitionTitleForCompare(finalTitle);
+
+      // 1차 사전 검사 - 현재 화면에 이미 불러와 있는 목록 기준(빠른 UX 피드백).
+      // 실제 방어에 더 가까운 최종 검사는 confirm 승인 후 재조회에서 한 번 더 한다.
+      const isDuplicateLocally = onhadaAdminExhibitions.some(function (ex) {
+        return onhadaNormalizeExhibitionTitleForCompare(ex.title) === normalizedFinalTitle;
+      });
+
+      if (isDuplicateLocally) {
+        if (statusEl) statusEl.textContent = "이미 사용 중인 전시관 이름입니다.";
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const confirmed = confirm('"' + finalTitle + '" 전시관을 비공개·준비 중 상태로 생성하시겠습니까?');
+        if (!confirmed) {
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = "최신 전시관 목록을 다시 확인하는 중입니다...";
+
+        // 실제 생성 직전에 최신 목록으로 한 번 더 중복을 검사한다. 이
+        // 클라이언트 검사는 UX용 사전 방어일 뿐이며, DB 수준 최종 중복
+        // 제약(title/slug UNIQUE 등)은 별도 마이그레이션으로 추가할 예정이다.
+        let latestResult;
+        try {
+          latestResult = await window.ONHADA_BACKEND.db.getExhibitionsForAdmin();
+        } catch (err) {
+          latestResult = { ok: false, exhibitions: [], error: null };
+        }
+
+        if (!latestResult.ok) {
+          if (statusEl) statusEl.textContent = (latestResult.error && latestResult.error.message) || "최신 전시관 목록을 확인하지 못해 생성을 중단했습니다.";
+          return;
+        }
+
+        onhadaAdminExhibitions = latestResult.exhibitions;
+
+        const isDuplicateLatest = onhadaAdminExhibitions.some(function (ex) {
+          return onhadaNormalizeExhibitionTitleForCompare(ex.title) === normalizedFinalTitle;
+        });
+
+        if (isDuplicateLatest) {
+          if (statusEl) statusEl.textContent = "이미 사용 중인 전시관 이름입니다.";
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = "전시관을 생성하는 중입니다...";
+
+        const input = {
+          title: finalTitle,
+          exhibition_type: exhibitionType,
+          tag: tag,
+          description: description,
+          allow_comments: allowComments
+        };
+
+        const result = await window.ONHADA_BACKEND.db.createExhibitionAsAdmin(input);
+
+        if (!result.ok) {
+          if (statusEl) statusEl.textContent = (result.error && result.error.message) || "전시관 생성에 실패했습니다.";
+          return;
+        }
+
+        onhadaResetAdminExhibitionForm();
+        if (statusEl) statusEl.textContent = "전시관이 비공개·준비 중 상태로 생성되었습니다.";
+
+        renderAdminCloudExhibitions();
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
 
     async function renderCloudPendingArtworks() {
       if (!isAdminAuthenticated) return;
