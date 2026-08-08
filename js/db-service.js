@@ -13,6 +13,12 @@
         return { code: code, message: message };
     }
 
+    var DB_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    function isValidUuid(value) {
+        return typeof value === 'string' && DB_UUID_RE.test(value);
+    }
+
     // title로부터 안전한 slug를 만든다. 원본 title이나 개인정보를 console에
     // 출력하지 않는다. 영문 소문자/숫자/한글/하이픈만 남기고, 끝에
     // crypto.randomUUID()의 앞 8자를 붙여 처음부터 고유 가능성을 높인다.
@@ -897,6 +903,332 @@
         }
     }
 
+    // 관리자용 - role IN ('pending','manager')인 프로필만 조회한다.
+    // admin 계정은 이 필터 자체에 의해 목록에서 제외된다.
+    async function getOperatorProfilesForAdmin() {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, profiles: [], error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, profiles: [], error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, profiles: [], error: safeError('role_not_allowed', '운영자 목록 조회는 관리자 계정만 가능합니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, profiles: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('profiles')
+                .select('id, display_name, role, manager_type, created_at')
+                .in('role', ['pending', 'manager'])
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                return { ok: false, profiles: [], error: safeError('operator_profiles_fetch_failed', '운영자 목록을 불러오지 못했습니다.') };
+            }
+
+            return { ok: true, profiles: Array.isArray(data) ? data : [], error: null };
+        } catch (err) {
+            return { ok: false, profiles: [], error: safeError('unexpected_error', '운영자 목록 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 관리자용 - pending 프로필 1건을 manager로 승격한다. role과
+    // manager_type을 한 UPDATE 문으로 함께 바꾸고, WHERE 절에도
+    // role='pending'을 다시 걸어 그 사이 상태가 바뀐 프로필을 실수로
+    // 덮어쓰지 않게 한다(사전 조회 확인 + UPDATE 자체 조건의 이중 방어).
+    async function approvePendingProfileAsManager(profileId, managerType) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, profile: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, profile: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, profile: null, error: safeError('role_not_allowed', '운영자 승인은 관리자 계정만 가능합니다.') };
+        }
+
+        if (!isValidUuid(profileId)) {
+            return { ok: false, profile: null, error: safeError('invalid_profile_id', '프로필 정보가 올바르지 않습니다.') };
+        }
+
+        if (['instructor', 'institution_staff', 'individual_creator'].indexOf(managerType) === -1) {
+            return { ok: false, profile: null, error: safeError('invalid_manager_type', '운영자 유형을 올바르게 선택해 주세요.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, profile: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data: existing, error: fetchError } = await client
+                .from('profiles')
+                .select('id, role')
+                .eq('id', profileId)
+                .maybeSingle();
+
+            if (fetchError) {
+                return { ok: false, profile: null, error: safeError('manager_approval_failed', '대상 프로필을 확인하지 못했습니다.') };
+            }
+
+            if (!existing) {
+                return { ok: false, profile: null, error: safeError('profile_not_found', '대상 프로필을 찾을 수 없습니다.') };
+            }
+
+            if (existing.role !== 'pending') {
+                return { ok: false, profile: null, error: safeError('profile_not_pending', '승인 대기 상태의 프로필만 운영자로 전환할 수 있습니다.') };
+            }
+
+            const { data, error } = await client
+                .from('profiles')
+                .update({ role: 'manager', manager_type: managerType })
+                .eq('id', profileId)
+                .eq('role', 'pending')
+                .select('id, display_name, role, manager_type, created_at')
+                .single();
+
+            if (error) {
+                return { ok: false, profile: null, error: safeError('manager_approval_failed', '운영자 승인에 실패했습니다.') };
+            }
+
+            return { ok: true, profile: data, error: null };
+        } catch (err) {
+            return { ok: false, profile: null, error: safeError('unexpected_error', '운영자 승인 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 관리자용 - 내부 전시관에 manager 프로필 1명을 배정한다.
+    async function assignExhibitionManager(exhibitionId, profileId) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, mapping: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, mapping: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, mapping: null, error: safeError('role_not_allowed', '전시관 배정은 관리자 계정만 가능합니다.') };
+        }
+
+        if (!isValidUuid(exhibitionId)) {
+            return { ok: false, mapping: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        if (!isValidUuid(profileId)) {
+            return { ok: false, mapping: null, error: safeError('invalid_profile_id', '프로필 정보가 올바르지 않습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, mapping: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data: exhibition, error: exError } = await client
+                .from('exhibitions')
+                .select('id, title, is_external')
+                .eq('id', exhibitionId)
+                .maybeSingle();
+
+            if (exError) {
+                return { ok: false, mapping: null, error: safeError('manager_assignment_failed', '전시관 정보를 확인하지 못했습니다.') };
+            }
+
+            if (!exhibition) {
+                return { ok: false, mapping: null, error: safeError('exhibition_not_found', '전시관을 찾을 수 없습니다.') };
+            }
+
+            if (exhibition.is_external) {
+                return { ok: false, mapping: null, error: safeError('external_exhibition_not_assignable', '외부 연동 전시관에는 운영자를 배정할 수 없습니다.') };
+            }
+
+            const { data: profile, error: profileError } = await client
+                .from('profiles')
+                .select('id, display_name, role, manager_type')
+                .eq('id', profileId)
+                .maybeSingle();
+
+            if (profileError) {
+                return { ok: false, mapping: null, error: safeError('manager_assignment_failed', '프로필 정보를 확인하지 못했습니다.') };
+            }
+
+            if (!profile) {
+                return { ok: false, mapping: null, error: safeError('profile_not_found', '대상 프로필을 찾을 수 없습니다.') };
+            }
+
+            if (profile.role !== 'manager') {
+                return { ok: false, mapping: null, error: safeError('profile_not_manager', '운영자 계정만 전시관에 배정할 수 있습니다.') };
+            }
+
+            // 반환값에는 mapping id 등 최소 필드만 담는다. 실제 화면(app.html)에는
+            // 이 UUID를 그대로 표시하지 않고, 배정 성공 여부와 운영자 표시명 등
+            // 안전한 정보만 사용할 예정이다.
+            const { data, error } = await client
+                .from('exhibition_managers')
+                .insert({ exhibition_id: exhibitionId, profile_id: profileId })
+                .select('id, exhibition_id, profile_id, created_at')
+                .single();
+
+            if (error) {
+                if (error.code === '23505') {
+                    return { ok: false, mapping: null, error: safeError('already_assigned', '이미 배정된 운영자입니다.') };
+                }
+                return { ok: false, mapping: null, error: safeError('manager_assignment_failed', '전시관 배정에 실패했습니다.') };
+            }
+
+            return { ok: true, mapping: data, error: null };
+        } catch (err) {
+            return { ok: false, mapping: null, error: safeError('unexpected_error', '전시관 배정 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 관리자용 - 특정 전시관의 담당 운영자 목록을 조회한다. profiles를
+    // FK 임베드로 함께 가져와 평탄화한다.
+    async function getExhibitionManagers(exhibitionId) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, managers: [], error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, managers: [], error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, managers: [], error: safeError('role_not_allowed', '담당 운영자 조회는 관리자 계정만 가능합니다.') };
+        }
+
+        if (!isValidUuid(exhibitionId)) {
+            return { ok: false, managers: [], error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, managers: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('exhibition_managers')
+                .select(`
+                    id,
+                    profile_id,
+                    created_at,
+                    profiles (
+                        display_name,
+                        role,
+                        manager_type,
+                        created_at
+                    )
+                `)
+                .eq('exhibition_id', exhibitionId)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                return { ok: false, managers: [], error: safeError('exhibition_managers_fetch_failed', '담당 운영자 목록을 불러오지 못했습니다.') };
+            }
+
+            const rows = Array.isArray(data) ? data : [];
+
+            const managers = rows
+                .filter(function (row) { return !!row.profiles; })
+                .map(function (row) {
+                    return {
+                        mappingId: row.id,
+                        profileId: row.profile_id,
+                        displayName: row.profiles.display_name,
+                        role: row.profiles.role,
+                        managerType: row.profiles.manager_type,
+                        profileCreatedAt: row.profiles.created_at,
+                        assignedAt: row.created_at
+                    };
+                });
+
+            return { ok: true, managers: managers, error: null };
+        } catch (err) {
+            return { ok: false, managers: [], error: safeError('unexpected_error', '담당 운영자 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 관리자용 - exhibition_managers 매핑 1건만 삭제한다. profiles 행이나
+    // 다른 매핑에는 전혀 손대지 않는다(운영자 계정/역할은 그대로 유지).
+    async function unassignExhibitionManager(mappingId) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, removed: false, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, removed: false, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, removed: false, error: safeError('role_not_allowed', '운영자 배정 해제는 관리자 계정만 가능합니다.') };
+        }
+
+        if (!isValidUuid(mappingId)) {
+            return { ok: false, removed: false, error: safeError('invalid_mapping_id', '배정 정보가 올바르지 않습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, removed: false, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data: existing, error: fetchError } = await client
+                .from('exhibition_managers')
+                .select('id')
+                .eq('id', mappingId)
+                .maybeSingle();
+
+            if (fetchError) {
+                return { ok: false, removed: false, error: safeError('manager_unassignment_failed', '배정 정보를 확인하지 못했습니다.') };
+            }
+
+            if (!existing) {
+                return { ok: false, removed: false, error: safeError('mapping_not_found', '배정 정보를 찾을 수 없습니다.') };
+            }
+
+            const { error } = await client
+                .from('exhibition_managers')
+                .delete()
+                .eq('id', mappingId);
+
+            if (error) {
+                return { ok: false, removed: false, error: safeError('manager_unassignment_failed', '운영자 배정 해제에 실패했습니다.') };
+            }
+
+            return { ok: true, removed: true, error: null };
+        } catch (err) {
+            return { ok: false, removed: false, error: safeError('unexpected_error', '운영자 배정 해제 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.db = {
         getMyManagedExhibitions: getMyManagedExhibitions,
         getManagedArtworks: getManagedArtworks,
@@ -909,6 +1241,11 @@
         approveArtworkAsAdmin: approveArtworkAsAdmin,
         rejectArtworkAsAdmin: rejectArtworkAsAdmin,
         getExhibitionsForAdmin: getExhibitionsForAdmin,
-        createExhibitionAsAdmin: createExhibitionAsAdmin
+        createExhibitionAsAdmin: createExhibitionAsAdmin,
+        getOperatorProfilesForAdmin: getOperatorProfilesForAdmin,
+        approvePendingProfileAsManager: approvePendingProfileAsManager,
+        assignExhibitionManager: assignExhibitionManager,
+        getExhibitionManagers: getExhibitionManagers,
+        unassignExhibitionManager: unassignExhibitionManager
     };
 })();
