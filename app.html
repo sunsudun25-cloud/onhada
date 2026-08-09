@@ -2855,7 +2855,7 @@
           <button class="sub-tab-btn active" onclick="switchSubTab('admin', 'a-stats')">성과 자료 관리</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-approve')">작품 승인/반려</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-create-hall')">전시관 만들기</button>
-          <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-cloud-exhibitions'); renderAdminCloudExhibitions();">클라우드 전시관 관리</button>
+          <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-cloud-exhibitions'); renderAdminCloudExhibitions(); renderAdminOperatorManagement();">클라우드 전시관 관리</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-create-exhibit')">전시회 만들기</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-students')">수강생 등록</button>
           <button class="sub-tab-btn" onclick="switchSubTab('admin', 'a-qr')">QR코드 생성</button>
@@ -2999,6 +2999,51 @@
             </div>
             <p id="onhada-admin-exhibition-list-status" style="color:var(--text-gray); font-size:0.9rem; margin: 10px 0;"></p>
             <div id="onhada-admin-exhibition-list"></div>
+          </div>
+
+          <!-- A. 가입 대기 계정 운영자 승인 -->
+          <div class="admin-table-container" style="margin-top:30px;">
+            <div class="admin-table-title">
+              <span>가입 대기 계정 운영자 승인</span>
+              <button class="btn-hero-secondary" id="onhada-admin-operator-refresh" onclick="renderAdminOperatorManagement()" style="font-size: 0.8rem;">새로고침</button>
+            </div>
+            <p id="onhada-admin-pending-status" style="color:var(--text-gray); font-size:0.9rem; margin: 10px 0;"></p>
+            <div id="onhada-admin-pending-list"></div>
+          </div>
+
+          <!-- B. 운영자 전시관 배정 -->
+          <div class="coach-control-panel" style="max-width:600px; margin-top:30px; margin-bottom:30px;">
+            <h3 style="color:#fff; margin-bottom:20px;">운영자 전시관 배정</h3>
+            <div class="form-group">
+              <label class="form-label">전시관</label>
+              <select id="onhada-admin-assignment-exhibition-select" class="form-control">
+                <option value="" style="background:#090916; color:#fff;">전시관을 선택하세요</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">운영자</label>
+              <select id="onhada-admin-assignment-operator-select" class="form-control">
+                <option value="" style="background:#090916; color:#fff;">운영자를 선택하세요</option>
+              </select>
+            </div>
+            <button type="button" class="btn-run-coach" id="onhada-admin-assignment-submit" onclick="onhadaAssignExhibitionManagerFromForm()">운영자 배정</button>
+            <p id="onhada-admin-assignment-status" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px;"></p>
+          </div>
+
+          <!-- C. 전시관별 담당 운영자 관리 -->
+          <div class="admin-table-container">
+            <div class="admin-table-title">
+              <span>전시관별 담당 운영자 관리</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">전시관 선택</label>
+              <select id="onhada-admin-managers-exhibition-select" class="form-control" onchange="onhadaSelectAdminManagersExhibition(this.value)">
+                <option value="" style="background:#090916; color:#fff;">전시관을 선택하세요</option>
+              </select>
+            </div>
+            <p id="onhada-admin-managers-status" style="color:var(--text-gray); font-size:0.9rem; margin: 10px 0;"></p>
+            <div id="onhada-admin-managers-list"></div>
+            <p style="color:var(--text-gray); font-size:0.8rem; margin-top:10px;">배정을 해제해도 해당 계정과 운영자 권한 자체는 그대로 유지됩니다.</p>
           </div>
         </div>
 
@@ -3240,10 +3285,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-11"></script>
-  <script src="js/auth-service.js?v=20260808-11"></script>
-  <script src="js/db-service.js?v=20260808-11"></script>
-  <script src="js/storage-service.js?v=20260808-11"></script>
+  <script src="js/supabase-client.js?v=20260808-12"></script>
+  <script src="js/auth-service.js?v=20260808-12"></script>
+  <script src="js/db-service.js?v=20260808-12"></script>
+  <script src="js/storage-service.js?v=20260808-12"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4623,6 +4668,15 @@
     let onhadaPublicArtworkBlobUrls = new Map();
     let onhadaAdminExhibitions = [];
     let onhadaAdminExhibitionsRequestSeq = 0;
+    let onhadaAdminOperatorProfiles = [];
+    let onhadaAdminOperatorRequestSeq = 0;
+    let onhadaAdminSelectedAssignmentExhibitionId = null;
+    let onhadaAdminExhibitionManagers = [];
+    let onhadaAdminExhibitionManagersRequestSeq = 0;
+    // 아래 두 배열은 "예시" 상태 목록에는 없지만, select option value에
+    // UUID를 직접 넣지 않기 위한 배열 인덱스 토큰의 기준 배열로 필요하다.
+    let onhadaAdminAssignableExhibitions = [];
+    let onhadaAdminAssignableManagers = [];
 
     function triggerAdminAccess() {
       if (isAdminAuthenticated) {
@@ -4714,6 +4768,11 @@
         const passEl = document.getElementById('admin-passcode');
         if (passEl) passEl.value = "";
         onhadaRevokeCloudPreviewUrls();
+        onhadaAdminOperatorProfiles = [];
+        onhadaAdminSelectedAssignmentExhibitionId = null;
+        onhadaAdminExhibitionManagers = [];
+        onhadaAdminAssignableExhibitions = [];
+        onhadaAdminAssignableManagers = [];
         switchView('browse');
       }
       showAlertDialog("로그아웃 완료", "기관 권한 세션이 안전하게 자동 파기되었습니다.", "🔒");
@@ -4741,6 +4800,21 @@
       if (managerType === 'institution_staff') return '기관 관리자';
       if (managerType === 'individual_creator') return '개인 전시관 운영자';
       return '운영자';
+    }
+
+    // "클라우드 전시관 관리" 탭 전용 - 기존 onhadaManagerTypeLabel()과 표기가
+    // 달라(예: "기관 담당자" vs "기관 관리자") 별도로 둔다.
+    function onhadaAdminManagerTypeLabel(managerType) {
+      if (managerType === 'instructor') return '강사';
+      if (managerType === 'institution_staff') return '기관 담당자';
+      if (managerType === 'individual_creator') return '개인 운영자';
+      return '미지정';
+    }
+
+    function onhadaAdminProfileRoleLabel(role) {
+      if (role === 'pending') return '승인 대기';
+      if (role === 'manager') return '운영자';
+      return '역할 미확인';
     }
 
     function onhadaExhibitionTypeLabel(exhibitionType) {
@@ -5550,6 +5624,7 @@
         onhadaAdminExhibitions = [];
         if (statusEl) statusEl.textContent = (result.error && result.error.message) || "클라우드 전시관 목록을 불러오지 못했습니다.";
         if (listEl) listEl.innerHTML = "";
+        onhadaRenderAdminAssignableExhibitionSelects();
         return;
       }
 
@@ -5559,6 +5634,7 @@
       if (exhibitions.length === 0) {
         if (statusEl) statusEl.textContent = "아직 생성된 클라우드 전시관이 없습니다.";
         if (listEl) listEl.innerHTML = "";
+        onhadaRenderAdminAssignableExhibitionSelects();
         return;
       }
 
@@ -5614,6 +5690,8 @@
 
         if (listEl) listEl.appendChild(row);
       });
+
+      onhadaRenderAdminAssignableExhibitionSelects();
     }
 
     async function onhadaSubmitAdminExhibition(event) {
@@ -5746,6 +5824,372 @@
         renderAdminCloudExhibitions();
       } finally {
         if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    // B/C 공용 - 내부 전시관(is_external=false)만 골라 두 select에 채운다.
+    // option value에는 UUID 대신 이 필터링된 배열의 인덱스만 쓴다. 실제
+    // exhibition id는 onhadaAdminAssignableExhibitions[index].id로만 참조한다.
+    function onhadaRenderAdminAssignableExhibitionSelects() {
+      const internalExhibitions = onhadaAdminExhibitions.filter(function (ex) { return !ex.is_external; });
+      onhadaAdminAssignableExhibitions = internalExhibitions;
+
+      [
+        document.getElementById('onhada-admin-assignment-exhibition-select'),
+        document.getElementById('onhada-admin-managers-exhibition-select')
+      ].forEach(function (selectEl) {
+        if (!selectEl) return;
+
+        selectEl.innerHTML = "";
+
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = "";
+        placeholderOpt.textContent = "전시관을 선택하세요";
+        placeholderOpt.style.background = '#090916';
+        placeholderOpt.style.color = '#fff';
+        selectEl.appendChild(placeholderOpt);
+
+        internalExhibitions.forEach(function (ex, index) {
+          const opt = document.createElement('option');
+          opt.value = String(index);
+          opt.textContent = ex.title || '(제목 없음)';
+          opt.style.background = '#090916';
+          opt.style.color = '#fff';
+          selectEl.appendChild(opt);
+        });
+      });
+    }
+
+    // B 전용 - role='manager'인 프로필만 배정 대상 select에 채운다. 마찬가지로
+    // option value는 배열 인덱스, 실제 profile id는
+    // onhadaAdminAssignableManagers[index].id로만 참조한다.
+    function onhadaRenderAdminAssignmentOperatorSelect() {
+      const selectEl = document.getElementById('onhada-admin-assignment-operator-select');
+      if (!selectEl) return;
+
+      const managerProfiles = onhadaAdminOperatorProfiles.filter(function (p) { return p.role === 'manager'; });
+      onhadaAdminAssignableManagers = managerProfiles;
+
+      selectEl.innerHTML = "";
+
+      const placeholderOpt = document.createElement('option');
+      placeholderOpt.value = "";
+      placeholderOpt.textContent = "운영자를 선택하세요";
+      placeholderOpt.style.background = '#090916';
+      placeholderOpt.style.color = '#fff';
+      selectEl.appendChild(placeholderOpt);
+
+      managerProfiles.forEach(function (profile, index) {
+        const opt = document.createElement('option');
+        opt.value = String(index);
+        opt.textContent = (profile.display_name || '(표시명 없음)') + ' · ' + onhadaAdminManagerTypeLabel(profile.manager_type) + ' · ' + onhadaFormatDate(profile.created_at);
+        opt.style.background = '#090916';
+        opt.style.color = '#fff';
+        selectEl.appendChild(opt);
+      });
+    }
+
+    // renderAllViews()에는 포함하지 않는다 - "클라우드 전시관 관리" 탭을
+    // 열 때만 명시적으로 호출한다.
+    async function renderAdminOperatorManagement() {
+      if (!isAdminAuthenticated) return;
+
+      // admin 전시관 목록이 아직 없으면 먼저 채운다(B/C 전시관 select가
+      // 필요로 함).
+      if (onhadaAdminExhibitions.length === 0) {
+        await renderAdminCloudExhibitions();
+      }
+
+      const statusEl = document.getElementById('onhada-admin-pending-status');
+      const listEl = document.getElementById('onhada-admin-pending-list');
+
+      onhadaAdminOperatorRequestSeq += 1;
+      const requestSeq = onhadaAdminOperatorRequestSeq;
+
+      if (statusEl) statusEl.textContent = "운영자 계정을 불러오는 중입니다...";
+      if (listEl) listEl.innerHTML = "";
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getOperatorProfilesForAdmin();
+      } catch (err) {
+        result = { ok: false, profiles: [], error: { code: 'unexpected_error', message: '운영자 계정을 불러오지 못했습니다.' } };
+      }
+
+      // stale 응답 가드: 응답이 오는 사이 새 요청이 시작됐으면 이 결과는 버린다.
+      if (requestSeq !== onhadaAdminOperatorRequestSeq) return;
+
+      if (!result.ok) {
+        onhadaAdminOperatorProfiles = [];
+        if (statusEl) statusEl.textContent = (result.error && result.error.message) || "운영자 계정을 불러오지 못했습니다.";
+        if (listEl) listEl.innerHTML = "";
+        onhadaRenderAdminAssignmentOperatorSelect();
+        onhadaRenderAdminAssignableExhibitionSelects();
+        return;
+      }
+
+      onhadaAdminOperatorProfiles = result.profiles;
+
+      const pendingProfiles = onhadaAdminOperatorProfiles.filter(function (p) { return p.role === 'pending'; });
+
+      if (listEl) listEl.innerHTML = "";
+
+      if (pendingProfiles.length === 0) {
+        if (statusEl) statusEl.textContent = "현재 승인 대기 중인 계정이 없습니다.";
+      } else {
+        if (statusEl) statusEl.textContent = `승인 대기 ${pendingProfiles.length}건`;
+
+        pendingProfiles.forEach(function (profile) {
+          const row = document.createElement('div');
+          row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
+
+          const nameEl = document.createElement('h4');
+          nameEl.style.cssText = "color:#fff; margin-bottom:6px;";
+          nameEl.textContent = profile.display_name || '(표시명 없음)';
+          row.appendChild(nameEl);
+
+          const dateEl = document.createElement('p');
+          dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-bottom:8px;";
+          dateEl.textContent = "가입일: " + onhadaFormatDate(profile.created_at);
+          row.appendChild(dateEl);
+
+          const badge = document.createElement('span');
+          badge.style.cssText = "background: rgba(245,158,11,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #f59e0b; display:inline-block; margin-bottom:10px;";
+          badge.textContent = onhadaAdminProfileRoleLabel(profile.role);
+          row.appendChild(badge);
+
+          const typeSelect = document.createElement('select');
+          typeSelect.className = 'form-control';
+          typeSelect.style.marginBottom = '10px';
+          [['instructor', '강사'], ['institution_staff', '기관 담당자'], ['individual_creator', '개인 운영자']].forEach(function (pair) {
+            const opt = document.createElement('option');
+            opt.value = pair[0];
+            opt.textContent = pair[1];
+            opt.style.background = '#090916';
+            opt.style.color = '#fff';
+            typeSelect.appendChild(opt);
+          });
+          row.appendChild(typeSelect);
+
+          // 실제 profileId는 이 클로저에서만 사용하고 DOM에는 전혀 쓰지 않는다.
+          const approveBtn = document.createElement('button');
+          approveBtn.className = 'btn-approve';
+          approveBtn.textContent = '운영자로 승인';
+          approveBtn.addEventListener('click', function () {
+            onhadaApprovePendingOperator(profile.id, profile.display_name, typeSelect, approveBtn);
+          });
+          row.appendChild(approveBtn);
+
+          if (listEl) listEl.appendChild(row);
+        });
+      }
+
+      onhadaRenderAdminAssignmentOperatorSelect();
+      onhadaRenderAdminAssignableExhibitionSelects();
+    }
+
+    async function onhadaApprovePendingOperator(profileId, displayName, typeSelectEl, buttonEl) {
+      if (!isAdminAuthenticated) return;
+
+      const managerType = typeSelectEl ? typeSelectEl.value : '';
+      const managerTypeLabel = onhadaAdminManagerTypeLabel(managerType);
+
+      if (buttonEl) buttonEl.disabled = true;
+
+      try {
+        const confirmed = confirm('"' + displayName + '" 계정을 "' + managerTypeLabel + '"(으)로 승인하시겠습니까?');
+        if (!confirmed) {
+          return;
+        }
+
+        const result = await window.ONHADA_BACKEND.db.approvePendingProfileAsManager(profileId, managerType);
+
+        if (!result.ok) {
+          showAlertDialog("승인 실패", (result.error && result.error.message) || "운영자 승인에 실패했습니다.", "⚠️");
+          return;
+        }
+
+        showAlertDialog("승인 완료", '"' + displayName + '" 계정이 운영자로 승인되었습니다.', "✔️");
+        renderAdminOperatorManagement();
+      } finally {
+        if (buttonEl) buttonEl.disabled = false;
+      }
+    }
+
+    async function onhadaAssignExhibitionManagerFromForm() {
+      if (!isAdminAuthenticated) return;
+
+      const exSelectEl = document.getElementById('onhada-admin-assignment-exhibition-select');
+      const opSelectEl = document.getElementById('onhada-admin-assignment-operator-select');
+      const statusEl = document.getElementById('onhada-admin-assignment-status');
+      const submitBtn = document.getElementById('onhada-admin-assignment-submit');
+
+      const exIndex = exSelectEl ? exSelectEl.value : '';
+      const opIndex = opSelectEl ? opSelectEl.value : '';
+
+      if (exIndex === '' || opIndex === '') {
+        if (statusEl) statusEl.textContent = "전시관과 운영자를 모두 선택해 주세요.";
+        return;
+      }
+
+      const exhibition = onhadaAdminAssignableExhibitions[Number(exIndex)];
+      const profile = onhadaAdminAssignableManagers[Number(opIndex)];
+
+      if (!exhibition || !profile) {
+        if (statusEl) statusEl.textContent = "선택한 정보를 다시 확인해 주세요.";
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const confirmed = confirm('"' + profile.display_name + '" 운영자를 "' + exhibition.title + '"에 배정하시겠습니까?');
+        if (!confirmed) {
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = "운영자를 배정하는 중입니다...";
+
+        const result = await window.ONHADA_BACKEND.db.assignExhibitionManager(exhibition.id, profile.id);
+
+        if (!result.ok) {
+          if (result.error && result.error.code === 'already_assigned') {
+            if (statusEl) statusEl.textContent = "이미 이 전시관에 배정된 운영자입니다.";
+          } else {
+            if (statusEl) statusEl.textContent = (result.error && result.error.message) || "운영자 배정에 실패했습니다.";
+          }
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = "운영자가 배정되었습니다.";
+        if (exSelectEl) exSelectEl.value = "";
+        if (opSelectEl) opSelectEl.value = "";
+
+        if (onhadaAdminSelectedAssignmentExhibitionId === exhibition.id) {
+          renderAdminExhibitionManagersList();
+        }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    function onhadaSelectAdminManagersExhibition(indexValue) {
+      const listEl = document.getElementById('onhada-admin-managers-list');
+      const statusEl = document.getElementById('onhada-admin-managers-status');
+
+      if (indexValue === '') {
+        onhadaAdminSelectedAssignmentExhibitionId = null;
+        onhadaAdminExhibitionManagersRequestSeq += 1;
+        if (listEl) listEl.innerHTML = "";
+        if (statusEl) statusEl.textContent = "";
+        return;
+      }
+
+      const exhibition = onhadaAdminAssignableExhibitions[Number(indexValue)];
+      if (!exhibition) return;
+
+      onhadaAdminSelectedAssignmentExhibitionId = exhibition.id;
+      renderAdminExhibitionManagersList();
+    }
+
+    // renderAllViews()에는 포함하지 않는다 - "전시관별 담당 운영자 관리"에서
+    // 전시관을 선택했을 때만 명시적으로 호출한다.
+    async function renderAdminExhibitionManagersList() {
+      if (!isAdminAuthenticated) return;
+      if (!onhadaAdminSelectedAssignmentExhibitionId) return;
+
+      const exhibitionId = onhadaAdminSelectedAssignmentExhibitionId;
+      const statusEl = document.getElementById('onhada-admin-managers-status');
+      const listEl = document.getElementById('onhada-admin-managers-list');
+
+      onhadaAdminExhibitionManagersRequestSeq += 1;
+      const requestSeq = onhadaAdminExhibitionManagersRequestSeq;
+
+      if (statusEl) statusEl.textContent = "담당 운영자 목록을 불러오는 중입니다...";
+      if (listEl) listEl.innerHTML = "";
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getExhibitionManagers(exhibitionId);
+      } catch (err) {
+        result = { ok: false, managers: [], error: { code: 'unexpected_error', message: '담당 운영자 목록을 불러오지 못했습니다.' } };
+      }
+
+      // stale 가드: 응답이 오는 사이 다른 전시관을 선택했거나 새 요청이
+      // 시작됐으면 이 결과로 화면을 덮지 않는다.
+      if (requestSeq !== onhadaAdminExhibitionManagersRequestSeq || onhadaAdminSelectedAssignmentExhibitionId !== exhibitionId) return;
+
+      if (!result.ok) {
+        onhadaAdminExhibitionManagers = [];
+        if (statusEl) statusEl.textContent = (result.error && result.error.message) || "담당 운영자 목록을 불러오지 못했습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      onhadaAdminExhibitionManagers = result.managers;
+
+      if (onhadaAdminExhibitionManagers.length === 0) {
+        if (statusEl) statusEl.textContent = "이 전시관에 배정된 운영자가 없습니다.";
+        if (listEl) listEl.innerHTML = "";
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `담당 운영자 ${onhadaAdminExhibitionManagers.length}명`;
+      if (listEl) listEl.innerHTML = "";
+
+      onhadaAdminExhibitionManagers.forEach(function (manager) {
+        const row = document.createElement('div');
+        row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;";
+
+        const infoBox = document.createElement('div');
+
+        const nameEl = document.createElement('h4');
+        nameEl.style.cssText = "color:#fff; margin-bottom:4px;";
+        nameEl.textContent = manager.displayName || '(표시명 없음)';
+        infoBox.appendChild(nameEl);
+
+        const metaEl = document.createElement('p');
+        metaEl.style.cssText = "color:var(--text-gray); font-size:0.85rem;";
+        metaEl.textContent = onhadaAdminManagerTypeLabel(manager.managerType) + ' · 배정일: ' + onhadaFormatDate(manager.assignedAt);
+        infoBox.appendChild(metaEl);
+
+        row.appendChild(infoBox);
+
+        // 실제 mappingId는 이 클로저에서만 사용하고 DOM에는 전혀 쓰지 않는다.
+        const unassignBtn = document.createElement('button');
+        unassignBtn.className = 'btn-reject';
+        unassignBtn.textContent = '배정 해제';
+        unassignBtn.addEventListener('click', function () {
+          onhadaUnassignExhibitionManager(manager.mappingId, manager.displayName, unassignBtn);
+        });
+        row.appendChild(unassignBtn);
+
+        if (listEl) listEl.appendChild(row);
+      });
+    }
+
+    async function onhadaUnassignExhibitionManager(mappingId, displayName, buttonEl) {
+      if (!isAdminAuthenticated) return;
+
+      if (buttonEl) buttonEl.disabled = true;
+
+      try {
+        const confirmed = confirm('"' + displayName + '" 운영자의 전시관 배정을 해제하시겠습니까?');
+        if (!confirmed) {
+          return;
+        }
+
+        const result = await window.ONHADA_BACKEND.db.unassignExhibitionManager(mappingId);
+
+        if (!result.ok) {
+          showAlertDialog("배정 해제 실패", (result.error && result.error.message) || "운영자 배정 해제에 실패했습니다.", "⚠️");
+          return;
+        }
+
+        showAlertDialog("배정 해제 완료", '"' + displayName + '" 운영자의 전시관 배정이 해제되었습니다. 계정과 운영자 권한은 그대로 유지됩니다.', "✔️");
+        renderAdminExhibitionManagersList();
+      } finally {
+        if (buttonEl) buttonEl.disabled = false;
       }
     }
 
