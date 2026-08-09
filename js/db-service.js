@@ -796,6 +796,93 @@
         }
     }
 
+    // 관리자 전용 - 특정 전시관의 작품을 상태(pending/approved/rejected/hidden)
+    // 구분 없이 전부 조회한다. getManagedArtworks()는 "담당 운영자인지" RLS를
+    // 통과해야 하므로 관리자가 담당하지 않는 전시관에는 쓸 수 없고,
+    // getPublicArtworksForExhibition()은 승인·공개·운영 중인 작품만 보여줘
+    // 미리보기 목적에 맞지 않는다. artworks 테이블에는 이미 관리자 역할
+    // 전체를 허용하는 SELECT RLS가 있다(getPendingArtworksForAdmin()이
+    // 전시관 구분 없이 status='pending'만 걸고 조회 가능한 것으로 확인됨).
+    // artist_age/submitted_by/approved_by/rejection_reason 등은 이 미리보기
+    // 목적에 필요하지 않으므로 select에 넣지 않는다.
+    async function getArtworksForAdminExhibition(exhibitionId) {
+        if (!isValidUuid(exhibitionId)) {
+            return { ok: false, artworks: [], error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, artworks: [], error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, artworks: [], error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, artworks: [], error: safeError('role_not_allowed', '작품 조회는 관리자 계정만 가능합니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artworks: [], error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .select(`
+                    id,
+                    title,
+                    media_type,
+                    artist_display_name,
+                    category_id,
+                    thumbnail_url,
+                    media_url,
+                    description,
+                    poem,
+                    status,
+                    consent_confirmed,
+                    created_at,
+                    categories (
+                        name
+                    )
+                `)
+                .eq('exhibition_id', exhibitionId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                return { ok: false, artworks: [], error: safeError('artworks_fetch_failed', '작품 목록을 불러오지 못했습니다.') };
+            }
+
+            const rows = Array.isArray(data) ? data : [];
+
+            const artworks = rows.map(function (row) {
+                return {
+                    id: row.id,
+                    title: row.title,
+                    media_type: row.media_type,
+                    artist_display_name: row.artist_display_name,
+                    category_id: row.category_id,
+                    thumbnail_url: row.thumbnail_url,
+                    media_url: row.media_url,
+                    description: row.description,
+                    poem: row.poem,
+                    status: row.status,
+                    consent_confirmed: row.consent_confirmed,
+                    created_at: row.created_at,
+                    categories: row.categories
+                };
+            });
+
+            return { ok: true, artworks: artworks, error: null };
+        } catch (err) {
+            return { ok: false, artworks: [], error: safeError('unexpected_error', '작품 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
     // 관리자용 - 신규 내부 전시관을 생성한다. 생성 직후에는 항상
     // private/preparing/non-demo/internal로 고정한다(운영자에게 공개 전환
     // 권한을 주지 않는다는 원칙과 별개로, 이 함수 자체도 그 외 상태로는
@@ -1243,6 +1330,7 @@
         approveArtworkAsAdmin: approveArtworkAsAdmin,
         rejectArtworkAsAdmin: rejectArtworkAsAdmin,
         getExhibitionsForAdmin: getExhibitionsForAdmin,
+        getArtworksForAdminExhibition: getArtworksForAdminExhibition,
         createExhibitionAsAdmin: createExhibitionAsAdmin,
         getOperatorProfilesForAdmin: getOperatorProfilesForAdmin,
         approvePendingProfileAsManager: approvePendingProfileAsManager,

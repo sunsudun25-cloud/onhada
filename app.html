@@ -3417,20 +3417,49 @@
     </div>
   </div>
 
-  <!-- 관리자 전용 - private/preparing 내부 전시관 입구 미리보기.
-       public 전환 없이 공개 입구와 동일한 내용을 관리자에게만 보여준다. -->
+  <!-- 관리자 전용 - private/preparing 내부 전시관 "관람 화면" 미리보기(입구→작품 목록).
+       public 전환 없이 실제 관람객이 보게 될 화면과 동일한 내용을 관리자에게만 보여준다. -->
   <div class="admin-login-overlay" id="onhada-admin-entrance-preview-modal" role="dialog" aria-modal="true" aria-labelledby="onhada-admin-entrance-preview-title">
     <div class="admin-login-box" id="onhada-admin-entrance-preview-dialog" style="max-width: 560px; width: 92%; text-align: left; max-height: 85vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <h3 id="onhada-admin-entrance-preview-title" style="font-size: 1.3rem; color: #fff;">입구 미리보기</h3>
+        <h3 id="onhada-admin-entrance-preview-title" style="font-size: 1.3rem; color: #fff;">관람 화면 미리보기</h3>
         <button class="btn-hero-secondary" id="onhada-admin-entrance-preview-close-x" onclick="onhadaCloseAdminEntrancePreview()" style="padding: 4px 12px; font-size: 0.85rem;" aria-label="미리보기 닫기">✕</button>
       </div>
-      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 18px;">이 화면은 관리자에게만 보이며, 공개 전환 없이 실제 공개 입구와 동일한 내용을 미리 확인합니다.</p>
+      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 18px;">이 화면은 관리자에게만 보이며, 공개 전환 없이 실제 관람객이 보게 될 입구·작품 목록과 동일한 내용을 미리 확인합니다.</p>
 
-      <div id="onhada-admin-entrance-preview-body"></div>
+      <div id="onhada-admin-entrance-preview-body">
+        <div id="onhada-admin-entrance-preview-entrance"></div>
+        <div id="onhada-admin-entrance-preview-artworks" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+            <h4 style="color:#fff; font-size:1.05rem;">작품 목록</h4>
+            <button class="btn-hero-secondary" id="onhada-admin-entrance-preview-back-btn" onclick="onhadaBackToAdminEntrancePreviewEntrance()" style="font-size: 0.8rem; padding: 5px 14px;">입구로 돌아가기</button>
+          </div>
+          <p id="onhada-admin-entrance-preview-artworks-status" style="color:var(--text-gray); font-size:0.85rem; margin-bottom:14px;"></p>
+          <div id="onhada-admin-entrance-preview-artworks-list"></div>
+        </div>
+      </div>
 
       <div style="margin-top: 22px; text-align: right;">
         <button class="btn-hero-secondary" id="onhada-admin-entrance-preview-close" onclick="onhadaCloseAdminEntrancePreview()">미리보기 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 관리자 전용 - private/preparing 내부 전시관 "운영 화면" 미리보기.
+       실제 운영자(view-manager) 화면과 동일한 구성을 읽기 전용으로 보여준다.
+       모든 입력/버튼은 disabled이며 실제 업로드·INSERT·UPDATE·DELETE는 절대 발생하지 않는다. -->
+  <div class="admin-login-overlay" id="onhada-admin-manager-preview-modal" role="dialog" aria-modal="true" aria-labelledby="onhada-admin-manager-preview-title">
+    <div class="admin-login-box" id="onhada-admin-manager-preview-dialog" style="max-width: 640px; width: 92%; text-align: left; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <h3 id="onhada-admin-manager-preview-title" style="font-size: 1.3rem; color: #fff;">운영 화면 미리보기</h3>
+        <button class="btn-hero-secondary" id="onhada-admin-manager-preview-close-x" onclick="onhadaCloseAdminManagerPreview()" style="padding: 4px 12px; font-size: 0.85rem;" aria-label="미리보기 닫기">✕</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 18px;">이 화면은 관리자에게만 보이는 읽기 전용 미리보기이며, 실제 운영자 화면과 동일한 구성입니다. 여기서는 작품을 등록할 수 없습니다.</p>
+
+      <div id="onhada-admin-manager-preview-body"></div>
+
+      <div style="margin-top: 22px; text-align: right;">
+        <button class="btn-hero-secondary" id="onhada-admin-manager-preview-close" onclick="onhadaCloseAdminManagerPreview()">미리보기 닫기</button>
       </div>
     </div>
   </div>
@@ -3450,10 +3479,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260809-3"></script>
-  <script src="js/auth-service.js?v=20260809-3"></script>
-  <script src="js/db-service.js?v=20260809-3"></script>
-  <script src="js/storage-service.js?v=20260809-3"></script>
+  <script src="js/supabase-client.js?v=20260809-4"></script>
+  <script src="js/auth-service.js?v=20260809-4"></script>
+  <script src="js/db-service.js?v=20260809-4"></script>
+  <script src="js/storage-service.js?v=20260809-4"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -5004,6 +5033,17 @@
     let onhadaAdminExhibitionsRequestSeq = 0;
     let onhadaAdminEntrancePreviewOpen = false;
     let onhadaAdminEntrancePreviewPreviousFocus = null;
+    let onhadaAdminEntrancePreviewExhibitionId = null;
+    let onhadaAdminEntrancePreviewArtworksRequestSeq = 0;
+    let onhadaAdminEntrancePreviewBlobUrls = new Map();
+    let onhadaAdminManagerPreviewOpen = false;
+    let onhadaAdminManagerPreviewPreviousFocus = null;
+    let onhadaAdminManagerPreviewRequestSeq = 0;
+    // 실제 운영자 화면(renderManagedArtworks)의 작품 목록도 이미지를 표시하지
+    // 않으므로 이 미리보기도 현재는 이미지를 불러오지 않는다 - 이 Map은
+    // 항상 비어 있지만, 향후 이미지 표시가 추가될 경우를 대비해 관람 화면
+    // 미리보기(onhadaAdminEntrancePreviewBlobUrls)와 완전히 분리해 둔다.
+    let onhadaAdminManagerPreviewBlobUrls = new Map();
     let onhadaAdminOperatorProfiles = [];
     let onhadaAdminOperatorRequestSeq = 0;
     let onhadaAdminSelectedAssignmentExhibitionId = null;
@@ -5104,6 +5144,8 @@
         const passEl = document.getElementById('admin-passcode');
         if (passEl) passEl.value = "";
         onhadaRevokeCloudPreviewUrls();
+        onhadaCloseAdminEntrancePreview();
+        onhadaCloseAdminManagerPreview();
         onhadaAdminOperatorProfiles = [];
         onhadaAdminSelectedAssignmentExhibitionId = null;
         onhadaAdminExhibitionManagers = [];
@@ -5865,6 +5907,8 @@
     // 않는다(returnValue/preventDefault를 쓰지 않음).
     window.addEventListener('beforeunload', function () {
       onhadaRevokeCloudPreviewUrls();
+      onhadaRevokeAdminEntrancePreviewBlobUrls();
+      onhadaRevokeAdminManagerPreviewBlobUrls();
     });
 
     // 확정된 전시관 명명 규칙 - exhibition_type별 고정 접두어.
@@ -5932,18 +5976,46 @@
       onhadaUpdateAdminExhibitionNamePreview();
     }
 
-    // 관리자 전용 입구 미리보기 모달. private/preparing 내부 전시관도
-    // 공개 전환 없이 실제 공개 입구와 동일한 콘텐츠(onhadaBuildHallEntranceContent)를
-    // 미리 볼 수 있게 한다. visibility/operation_status는 절대 바꾸지 않고,
-    // onhadaAdminExhibitions 캐시 배열만 읽어 추가 DB/API 호출 없이 렌더한다.
-    // 공개 입구 화면(hall-entrance-container, activeSupabaseExhibitionId,
-    // onhadaPublicArtworksRequestSeq, onhadaPublicArtworkBlobUrls)과는 완전히
-    // 분리되어 있으며 서로 건드리지 않는다.
+    // 관리자 전용 "관람 화면" 미리보기 모달(입구→작품 목록). private/preparing
+    // 내부 전시관도 공개 전환 없이 실제 관람객 입구·작품 목록과 동일한
+    // 콘텐츠를 미리 볼 수 있게 한다. visibility/operation_status는 절대
+    // 바꾸지 않는다. 공개 관람 화면(hall-entrance-container,
+    // activeSupabaseExhibitionId, onhadaPublicArtworksRequestSeq,
+    // onhadaPublicArtworkBlobUrls)과는 완전히 분리되어 있으며 서로 건드리지 않고,
+    // 공개용 getPublicArtworksForExhibition()도 사용하지 않는다(대신
+    // 관리자 전용 getArtworksForAdminExhibition() 사용).
     function onhadaAdminEntrancePreviewKeydownHandler(evt) {
       if (evt.key === 'Escape' || evt.key === 'Esc') {
         evt.preventDefault();
         onhadaCloseAdminEntrancePreview();
       }
+    }
+
+    function onhadaRevokeAdminEntrancePreviewBlobUrls() {
+      onhadaAdminEntrancePreviewBlobUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+      });
+      onhadaAdminEntrancePreviewBlobUrls.clear();
+    }
+
+    // 입구 콘텐츠는 공개 입구와 동일한 onhadaBuildHallEntranceContent()를
+    // 재사용하고, "전시장 입장하기" 버튼만 관리자 미리보기 전용으로 붙인다.
+    function onhadaRenderAdminEntrancePreviewEntrance(exhibition) {
+      const container = document.getElementById('onhada-admin-entrance-preview-entrance');
+      if (!container) return;
+
+      onhadaBuildHallEntranceContent(exhibition, { container: container });
+
+      const actions = document.createElement('div');
+      actions.className = 'hall-entrance-actions';
+
+      const enterBtn = document.createElement('button');
+      enterBtn.className = 'btn-hero-primary';
+      enterBtn.textContent = '전시장 입장하기';
+      enterBtn.addEventListener('click', () => onhadaEnterAdminPreviewArtworkList(exhibition.id));
+      actions.appendChild(enterBtn);
+
+      container.appendChild(actions);
     }
 
     function onhadaOpenAdminEntrancePreview(index) {
@@ -5961,12 +6033,22 @@
       if (exhibition.is_external) return;
 
       const overlay = document.getElementById('onhada-admin-entrance-preview-modal');
-      const bodyEl = document.getElementById('onhada-admin-entrance-preview-body');
+      const entranceEl = document.getElementById('onhada-admin-entrance-preview-entrance');
+      const artworksEl = document.getElementById('onhada-admin-entrance-preview-artworks');
       const closeBtn = document.getElementById('onhada-admin-entrance-preview-close');
-      if (!overlay || !bodyEl) return;
+      if (!overlay || !entranceEl || !artworksEl) return;
+
+      // 다른 전시관 미리보기를 여는 경우를 대비해 이전 작품 조회/blob 상태를 정리한다.
+      onhadaAdminEntrancePreviewArtworksRequestSeq += 1;
+      onhadaRevokeAdminEntrancePreviewBlobUrls();
+      onhadaAdminEntrancePreviewExhibitionId = exhibition.id;
+
+      // 항상 입구 화면부터 시작한다.
+      artworksEl.style.display = 'none';
+      entranceEl.style.display = 'block';
 
       // D4: 추가 DB/API 호출 없이 현재 관리자 목록 캐시 객체만 사용한다.
-      onhadaBuildHallEntranceContent(exhibition, { container: bodyEl });
+      onhadaRenderAdminEntrancePreviewEntrance(exhibition);
 
       onhadaAdminEntrancePreviewOpen = true;
       onhadaAdminEntrancePreviewPreviousFocus = document.activeElement;
@@ -5978,19 +6060,673 @@
       if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
     }
 
+    // "전시장 입장하기" 클릭 시에만 호출된다. 이 시점 이전에는 작품 조회
+    // API가 전혀 호출되지 않는다. private/preparing 전시관도 관리자만
+    // 조회할 수 있도록 getArtworksForAdminExhibition()을 사용한다.
+    function onhadaEnterAdminPreviewArtworkList(exhibitionId) {
+      const entranceEl = document.getElementById('onhada-admin-entrance-preview-entrance');
+      const artworksEl = document.getElementById('onhada-admin-entrance-preview-artworks');
+      if (entranceEl) entranceEl.style.display = 'none';
+      if (artworksEl) artworksEl.style.display = 'block';
+
+      renderAdminEntrancePreviewArtworks(exhibitionId);
+    }
+
+    // "입구로 돌아가기" - activeSupabaseExhibitionId류의 값(onhadaAdminEntrancePreviewExhibitionId)은
+    // 그대로 유지하고, 작품 API는 재호출하지 않는다.
+    function onhadaBackToAdminEntrancePreviewEntrance() {
+      const entranceEl = document.getElementById('onhada-admin-entrance-preview-entrance');
+      const artworksEl = document.getElementById('onhada-admin-entrance-preview-artworks');
+
+      // 진행 중이던 작품/이미지 요청을 무효화하고, 받아둔 blob은 정리한다.
+      onhadaAdminEntrancePreviewArtworksRequestSeq += 1;
+      onhadaRevokeAdminEntrancePreviewBlobUrls();
+
+      if (artworksEl) artworksEl.style.display = 'none';
+      if (entranceEl) entranceEl.style.display = 'block';
+    }
+
+    async function renderAdminEntrancePreviewArtworks(exhibitionId) {
+      const statusEl = document.getElementById('onhada-admin-entrance-preview-artworks-status');
+      const listEl = document.getElementById('onhada-admin-entrance-preview-artworks-list');
+      if (!listEl) return;
+
+      onhadaAdminEntrancePreviewArtworksRequestSeq += 1;
+      const requestSeq = onhadaAdminEntrancePreviewArtworksRequestSeq;
+
+      onhadaRevokeAdminEntrancePreviewBlobUrls();
+
+      listEl.innerHTML = "";
+      if (statusEl) statusEl.textContent = "작품 목록을 불러오는 중입니다...";
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getArtworksForAdminExhibition(exhibitionId);
+      } catch (err) {
+        result = { ok: false, artworks: [], error: null };
+      }
+
+      // stale 가드: 응답이 오는 사이 모달을 닫았거나 다른 전시관/새 요청이 시작됐으면 무시한다.
+      if (requestSeq !== onhadaAdminEntrancePreviewArtworksRequestSeq || !onhadaAdminEntrancePreviewOpen || onhadaAdminEntrancePreviewExhibitionId !== exhibitionId) return;
+
+      if (!result.ok) {
+        if (statusEl) statusEl.textContent = (result.error && result.error.message) || "작품 목록을 불러오지 못했습니다.";
+        listEl.innerHTML = "";
+        return;
+      }
+
+      const artworks = result.artworks;
+
+      if (artworks.length === 0) {
+        if (statusEl) statusEl.textContent = "아직 등록된 작품이 없습니다.";
+        listEl.innerHTML = "";
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `작품 ${artworks.length}건`;
+      listEl.innerHTML = "";
+
+      artworks.forEach(art => {
+        const row = document.createElement('div');
+        row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
+
+        const imgWrapper = document.createElement('div');
+        imgWrapper.className = 'img-wrapper';
+        imgWrapper.style.cssText = "border-radius: 10px; overflow: hidden; margin-bottom: 10px; max-width: 260px;";
+        row.appendChild(imgWrapper);
+
+        const titleEl = document.createElement('h4');
+        titleEl.style.cssText = "color:#fff; margin-bottom:6px;";
+        titleEl.textContent = art.title || '(제목 없음)';
+        row.appendChild(titleEl);
+
+        const authorEl = document.createElement('p');
+        authorEl.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:8px;";
+        authorEl.textContent = art.artist_display_name || '작가 미상';
+        row.appendChild(authorEl);
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;";
+
+        const categoryName = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
+
+        [categoryName, onhadaMediaTypeLabel(art.media_type)].forEach(labelText => {
+          const badge = document.createElement('span');
+          badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+          badge.textContent = labelText;
+          badgeRow.appendChild(badge);
+        });
+
+        const statusBadge = document.createElement('span');
+        if (art.status === 'approved') {
+          statusBadge.style.cssText = "background: rgba(16,185,129,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #10b981;";
+        } else if (art.status === 'rejected') {
+          statusBadge.style.cssText = "background: rgba(239,68,68,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #ef4444;";
+        } else if (art.status === 'pending') {
+          statusBadge.style.cssText = "background: rgba(245,158,11,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #f59e0b;";
+        } else {
+          statusBadge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: var(--text-gray);";
+        }
+        statusBadge.textContent = onhadaArtworkStatusLabel(art.status);
+        badgeRow.appendChild(statusBadge);
+
+        const consentBadge = document.createElement('span');
+        if (art.consent_confirmed) {
+          consentBadge.style.cssText = "background: rgba(16,185,129,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: #10b981;";
+          consentBadge.textContent = "전시 동의 확인";
+        } else {
+          consentBadge.style.cssText = "background: rgba(239,68,68,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: #ef4444;";
+          consentBadge.textContent = "전시 동의 미확인";
+        }
+        badgeRow.appendChild(consentBadge);
+
+        row.appendChild(badgeRow);
+
+        if (art.description) {
+          const descEl = document.createElement('p');
+          descEl.style.cssText = "font-size:0.85rem; color:var(--text-gray); margin-bottom:6px;";
+          descEl.textContent = art.description;
+          row.appendChild(descEl);
+        }
+
+        if (art.poem) {
+          const poemEl = document.createElement('p');
+          poemEl.style.cssText = "font-size:0.85rem; color:#ddd; margin-bottom:6px; white-space:pre-wrap;";
+          poemEl.textContent = art.poem;
+          row.appendChild(poemEl);
+        }
+
+        const dateEl = document.createElement('p');
+        dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem;";
+        dateEl.textContent = onhadaFormatDate(art.created_at);
+        row.appendChild(dateEl);
+
+        listEl.appendChild(row);
+
+        // media_type='text' 등 이미지가 아닌 작품은 Storage 다운로드를 시도하지 않는다.
+        if (art.media_type === 'image') {
+          onhadaLoadAdminPreviewArtworkImage(art, requestSeq, exhibitionId, imgWrapper);
+        } else {
+          imgWrapper.remove();
+        }
+      });
+    }
+
+    // 이미지 작품 1건의 private Blob을 받아 표시한다(공개 화면의
+    // onhadaLoadPublicArtworkImage와 동일한 방식이지만, 이 미리보기 전용
+    // requestSeq/Map만 사용한다). public/signed URL은 절대 만들지 않는다.
+    async function onhadaLoadAdminPreviewArtworkImage(art, requestSeq, exhibitionId, containerEl) {
+      const path = art.media_url || art.thumbnail_url;
+      if (!path) {
+        containerEl.remove();
+        return;
+      }
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      // stale 가드: 응답이 오는 사이 모달을 닫았거나 다른 전시관/새 요청이 시작됐으면
+      // 방금 받은 결과를 화면에 반영하지 않고 즉시 정리한다.
+      if (requestSeq !== onhadaAdminEntrancePreviewArtworksRequestSeq || !onhadaAdminEntrancePreviewOpen || onhadaAdminEntrancePreviewExhibitionId !== exhibitionId) return;
+
+      if (!result.ok || !result.blob) {
+        containerEl.remove();
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      if (requestSeq !== onhadaAdminEntrancePreviewArtworksRequestSeq || !onhadaAdminEntrancePreviewOpen || onhadaAdminEntrancePreviewExhibitionId !== exhibitionId) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      onhadaAdminEntrancePreviewBlobUrls.set(art.id, objectUrl);
+
+      containerEl.innerHTML = "";
+      const img = document.createElement('img');
+      img.src = objectUrl;
+      img.alt = (art.title || '작품') + ' 이미지';
+      img.loading = 'lazy';
+      img.style.cssText = "width:100%; height:auto; display:block;";
+      containerEl.appendChild(img);
+    }
+
     function onhadaCloseAdminEntrancePreview() {
       if (!onhadaAdminEntrancePreviewOpen) return;
       onhadaAdminEntrancePreviewOpen = false;
 
+      // 진행 중이던 작품/이미지 요청을 무효화하고 blob을 정리한다.
+      onhadaAdminEntrancePreviewArtworksRequestSeq += 1;
+      onhadaRevokeAdminEntrancePreviewBlobUrls();
+      onhadaAdminEntrancePreviewExhibitionId = null;
+
       const overlay = document.getElementById('onhada-admin-entrance-preview-modal');
-      const bodyEl = document.getElementById('onhada-admin-entrance-preview-body');
+      const entranceEl = document.getElementById('onhada-admin-entrance-preview-entrance');
+      const artworksEl = document.getElementById('onhada-admin-entrance-preview-artworks');
+      const artworksListEl = document.getElementById('onhada-admin-entrance-preview-artworks-list');
+      const artworksStatusEl = document.getElementById('onhada-admin-entrance-preview-artworks-status');
       if (overlay) overlay.style.display = 'none';
-      if (bodyEl) bodyEl.innerHTML = "";
+      if (entranceEl) entranceEl.innerHTML = "";
+      if (artworksListEl) artworksListEl.innerHTML = "";
+      if (artworksStatusEl) artworksStatusEl.textContent = "";
+      // 다음에 열 때 항상 입구부터 다시 시작한다.
+      if (artworksEl) artworksEl.style.display = 'none';
+      if (entranceEl) entranceEl.style.display = 'block';
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onhadaAdminEntrancePreviewKeydownHandler);
 
       const toFocus = onhadaAdminEntrancePreviewPreviousFocus;
       onhadaAdminEntrancePreviewPreviousFocus = null;
+      if (toFocus && typeof toFocus.focus === 'function') toFocus.focus();
+    }
+
+    // 관리자 전용 "운영 화면" 미리보기 모달. 실제 view-manager 화면(운영자
+    // 대시보드)의 디자인·필드 구성을 최대한 재사용하되 완전히 분리된
+    // DOM/id를 새로 만든다. 모든 입력/버튼은 disabled이며, 실제 manager
+    // 인증 상태(isManagerAuthenticated)·currentManagedExhibitionId·
+    // currentManagedExhibitions·실제 등록 폼 상태는 절대 건드리지 않는다.
+    // 작품 목록은 오직 getArtworksForAdminExhibition()의 실제 조회 결과만
+    // 사용하며, 가짜 작품/카테고리를 만들지 않는다.
+    function onhadaAdminManagerPreviewKeydownHandler(evt) {
+      if (evt.key === 'Escape' || evt.key === 'Esc') {
+        evt.preventDefault();
+        onhadaCloseAdminManagerPreview();
+      }
+    }
+
+    function onhadaRevokeAdminManagerPreviewBlobUrls() {
+      onhadaAdminManagerPreviewBlobUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+      });
+      onhadaAdminManagerPreviewBlobUrls.clear();
+    }
+
+    function onhadaRenderAdminManagerPreviewHeader(container, exhibition) {
+      const headerBox = document.createElement('div');
+      headerBox.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 18px; margin-bottom: 20px;";
+
+      const titleEl = document.createElement('h4');
+      titleEl.style.cssText = "color:#fff; margin-bottom:8px;";
+      titleEl.textContent = exhibition.title || '(제목 없음)';
+      headerBox.appendChild(titleEl);
+
+      const badgeRow = document.createElement('div');
+      badgeRow.style.cssText = "display:flex; flex-wrap:wrap; gap:6px;";
+
+      [
+        onhadaExhibitionTypeLabel(exhibition.exhibition_type),
+        onhadaOperationStatusLabel(exhibition.operation_status),
+        onhadaVisibilityLabel(exhibition.visibility)
+      ].forEach(labelText => {
+        const badge = document.createElement('span');
+        badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+        badge.textContent = labelText;
+        badgeRow.appendChild(badge);
+      });
+
+      headerBox.appendChild(badgeRow);
+      container.appendChild(headerBox);
+    }
+
+    // 실제 운영자 화면(renderManagedArtworks)과 동일한 표시 구성(제목/작가/
+    // 카테고리·유형 배지/상태 배지/동의 배지/날짜)을 재사용한다. 실제
+    // 운영자 목록도 이미지를 표시하지 않으므로 여기서도 이미지는 불러오지 않는다.
+    function onhadaRenderAdminManagerPreviewArtworksList(listEl, artworks) {
+      listEl.innerHTML = "";
+
+      if (!Array.isArray(artworks) || artworks.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.style.cssText = "color:var(--text-gray); font-size:0.9rem;";
+        emptyMsg.textContent = "아직 등록된 작품이 없습니다.";
+        listEl.appendChild(emptyMsg);
+        return;
+      }
+
+      artworks.forEach(art => {
+        const row = document.createElement('div');
+        row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
+
+        const titleRow = document.createElement('h4');
+        titleRow.style.cssText = "color:#fff; margin-bottom:6px;";
+        titleRow.textContent = art.title || '(제목 없음)';
+        row.appendChild(titleRow);
+
+        const authorEl = document.createElement('p');
+        authorEl.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:8px;";
+        authorEl.textContent = art.artist_display_name || '작가 미상';
+        row.appendChild(authorEl);
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;";
+
+        const categoryName = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
+
+        [categoryName, onhadaMediaTypeLabel(art.media_type)].forEach(labelText => {
+          const badge = document.createElement('span');
+          badge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray);";
+          badge.textContent = labelText;
+          badgeRow.appendChild(badge);
+        });
+
+        const statusBadge = document.createElement('span');
+        if (art.status === 'approved') {
+          statusBadge.style.cssText = "background: rgba(16,185,129,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #10b981;";
+        } else if (art.status === 'rejected') {
+          statusBadge.style.cssText = "background: rgba(239,68,68,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #ef4444;";
+        } else if (art.status === 'pending') {
+          statusBadge.style.cssText = "background: rgba(245,158,11,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: #f59e0b;";
+        } else {
+          statusBadge.style.cssText = "background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; font-weight:700; color: var(--text-gray);";
+        }
+        statusBadge.textContent = onhadaArtworkStatusLabel(art.status);
+        badgeRow.appendChild(statusBadge);
+
+        const consentBadge = document.createElement('span');
+        if (art.consent_confirmed) {
+          consentBadge.style.cssText = "background: rgba(16,185,129,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: #10b981;";
+          consentBadge.textContent = "전시 동의 확인";
+        } else {
+          consentBadge.style.cssText = "background: rgba(239,68,68,0.15); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: #ef4444;";
+          consentBadge.textContent = "전시 동의 미확인";
+        }
+        badgeRow.appendChild(consentBadge);
+
+        row.appendChild(badgeRow);
+
+        const dateEl = document.createElement('p');
+        dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem;";
+        dateEl.textContent = onhadaFormatDate(art.created_at);
+        row.appendChild(dateEl);
+
+        listEl.appendChild(row);
+      });
+    }
+
+    // 실제 #onhada-manager-artwork-section(텍스트 작품 등록)과 동일한
+    // 라벨·입력 순서·필수 항목을 그대로 보여주되, 완전히 다른 id를 쓰고
+    // 모든 입력/버튼을 disabled 처리한다. 카테고리는 이미 다른 화면에서
+    // 캐시된 currentManagerCategories가 있으면 그 실제 값을 그대로
+    // 재사용하고(추가 API 호출 없음), 없으면 안내 문구만 표시한다 - 이
+    // 미리보기를 위해 별도로 카테고리를 새로 조회하지 않는다.
+    function onhadaRenderAdminManagerPreviewTextForm(container) {
+      const box = document.createElement('div');
+      box.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px; margin-bottom: 20px;";
+
+      const heading = document.createElement('h3');
+      heading.style.cssText = "color:#fff; margin-bottom:16px;";
+      heading.textContent = '텍스트 작품 등록';
+      box.appendChild(heading);
+
+      function addLabel(text) {
+        const label = document.createElement('label');
+        label.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;";
+        label.textContent = text;
+        box.appendChild(label);
+      }
+
+      addLabel('작품명');
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.id = 'onhada-admin-manager-preview-text-title';
+      titleInput.className = 'form-control';
+      titleInput.maxLength = 100;
+      titleInput.disabled = true;
+      titleInput.style.marginBottom = '14px';
+      box.appendChild(titleInput);
+
+      addLabel('작가 표시명');
+      const authorInput = document.createElement('input');
+      authorInput.type = 'text';
+      authorInput.id = 'onhada-admin-manager-preview-text-author';
+      authorInput.className = 'form-control';
+      authorInput.maxLength = 50;
+      authorInput.disabled = true;
+      authorInput.style.marginBottom = '14px';
+      box.appendChild(authorInput);
+
+      addLabel('카테고리');
+      const categorySelect = document.createElement('select');
+      categorySelect.id = 'onhada-admin-manager-preview-text-category';
+      categorySelect.className = 'form-control';
+      categorySelect.disabled = true;
+      categorySelect.style.marginBottom = '14px';
+      const placeholderOpt = document.createElement('option');
+      placeholderOpt.value = '';
+      placeholderOpt.textContent = '카테고리를 선택하세요';
+      placeholderOpt.style.background = '#090916';
+      placeholderOpt.style.color = '#fff';
+      categorySelect.appendChild(placeholderOpt);
+      if (Array.isArray(currentManagerCategories)) {
+        currentManagerCategories.forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = cat.id;
+          opt.textContent = cat.name;
+          opt.style.background = '#090916';
+          opt.style.color = '#fff';
+          categorySelect.appendChild(opt);
+        });
+      }
+      box.appendChild(categorySelect);
+
+      addLabel('작품 설명');
+      const descTextarea = document.createElement('textarea');
+      descTextarea.id = 'onhada-admin-manager-preview-text-description';
+      descTextarea.className = 'form-control';
+      descTextarea.maxLength = 500;
+      descTextarea.rows = 3;
+      descTextarea.disabled = true;
+      descTextarea.style.cssText = "margin-bottom:14px; resize:vertical;";
+      box.appendChild(descTextarea);
+
+      addLabel('글/시 내용');
+      const poemTextarea = document.createElement('textarea');
+      poemTextarea.id = 'onhada-admin-manager-preview-text-poem';
+      poemTextarea.className = 'form-control';
+      poemTextarea.maxLength = 2000;
+      poemTextarea.rows = 4;
+      poemTextarea.disabled = true;
+      poemTextarea.style.cssText = "margin-bottom:14px; resize:vertical;";
+      box.appendChild(poemTextarea);
+
+      const consentLabel = document.createElement('label');
+      consentLabel.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px;";
+      const consentInput = document.createElement('input');
+      consentInput.type = 'checkbox';
+      consentInput.id = 'onhada-admin-manager-preview-text-consent';
+      consentInput.disabled = true;
+      consentInput.style.marginTop = '3px';
+      const consentSpan = document.createElement('span');
+      consentSpan.textContent = '작가 또는 보호자에게 온라인 전시 및 작품 공개 동의를 확인했습니다.';
+      consentLabel.appendChild(consentInput);
+      consentLabel.appendChild(consentSpan);
+      box.appendChild(consentLabel);
+
+      const submitBtn = document.createElement('button');
+      submitBtn.className = 'btn-hero-primary';
+      submitBtn.id = 'onhada-admin-manager-preview-text-submit';
+      submitBtn.style.width = '100%';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '작품 등록';
+      box.appendChild(submitBtn);
+
+      const noticeEl = document.createElement('p');
+      noticeEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-top:10px;";
+      noticeEl.textContent = '관리자 미리보기에서는 작품을 등록할 수 없습니다. 실제 운영자 계정으로 로그인하면 사용할 수 있습니다.';
+      box.appendChild(noticeEl);
+
+      container.appendChild(box);
+    }
+
+    // 실제 #onhada-manager-image-section(이미지 작품 등록)과 동일한 구성.
+    function onhadaRenderAdminManagerPreviewImageForm(container) {
+      const box = document.createElement('div');
+      box.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px; margin-bottom: 20px;";
+
+      const heading = document.createElement('h3');
+      heading.style.cssText = "color:#fff; margin-bottom:16px;";
+      heading.textContent = '이미지 작품 등록';
+      box.appendChild(heading);
+
+      function addLabel(text) {
+        const label = document.createElement('label');
+        label.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;";
+        label.textContent = text;
+        box.appendChild(label);
+      }
+
+      addLabel('이미지 파일');
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.id = 'onhada-admin-manager-preview-image-file';
+      fileInput.className = 'form-control';
+      fileInput.accept = 'image/jpeg,image/png,image/webp';
+      fileInput.disabled = true;
+      fileInput.style.marginBottom = '14px';
+      box.appendChild(fileInput);
+
+      addLabel('작품명');
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.id = 'onhada-admin-manager-preview-image-title';
+      titleInput.className = 'form-control';
+      titleInput.maxLength = 100;
+      titleInput.disabled = true;
+      titleInput.style.marginBottom = '14px';
+      box.appendChild(titleInput);
+
+      addLabel('작가 표시명');
+      const authorInput = document.createElement('input');
+      authorInput.type = 'text';
+      authorInput.id = 'onhada-admin-manager-preview-image-author';
+      authorInput.className = 'form-control';
+      authorInput.maxLength = 50;
+      authorInput.disabled = true;
+      authorInput.style.marginBottom = '14px';
+      box.appendChild(authorInput);
+
+      addLabel('카테고리');
+      const categorySelect = document.createElement('select');
+      categorySelect.id = 'onhada-admin-manager-preview-image-category';
+      categorySelect.className = 'form-control';
+      categorySelect.disabled = true;
+      categorySelect.style.marginBottom = '14px';
+      const placeholderOpt = document.createElement('option');
+      placeholderOpt.value = '';
+      placeholderOpt.textContent = '카테고리를 선택하세요';
+      placeholderOpt.style.background = '#090916';
+      placeholderOpt.style.color = '#fff';
+      categorySelect.appendChild(placeholderOpt);
+      if (Array.isArray(currentManagerCategories)) {
+        currentManagerCategories.forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = cat.id;
+          opt.textContent = cat.name;
+          opt.style.background = '#090916';
+          opt.style.color = '#fff';
+          categorySelect.appendChild(opt);
+        });
+      }
+      box.appendChild(categorySelect);
+
+      addLabel('작품 설명');
+      const descTextarea = document.createElement('textarea');
+      descTextarea.id = 'onhada-admin-manager-preview-image-description';
+      descTextarea.className = 'form-control';
+      descTextarea.maxLength = 500;
+      descTextarea.rows = 3;
+      descTextarea.disabled = true;
+      descTextarea.style.cssText = "margin-bottom:14px; resize:vertical;";
+      box.appendChild(descTextarea);
+
+      const consentLabel = document.createElement('label');
+      consentLabel.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px;";
+      const consentInput = document.createElement('input');
+      consentInput.type = 'checkbox';
+      consentInput.id = 'onhada-admin-manager-preview-image-consent';
+      consentInput.disabled = true;
+      consentInput.style.marginTop = '3px';
+      const consentSpan = document.createElement('span');
+      consentSpan.textContent = '작가 또는 보호자에게 온라인 전시 및 작품 공개 동의를 확인했습니다.';
+      consentLabel.appendChild(consentInput);
+      consentLabel.appendChild(consentSpan);
+      box.appendChild(consentLabel);
+
+      const submitBtn = document.createElement('button');
+      submitBtn.className = 'btn-hero-primary';
+      submitBtn.id = 'onhada-admin-manager-preview-image-submit';
+      submitBtn.style.width = '100%';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '이미지 작품 등록';
+      box.appendChild(submitBtn);
+
+      const noticeEl = document.createElement('p');
+      noticeEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-top:10px;";
+      noticeEl.textContent = '관리자 미리보기에서는 작품을 등록할 수 없습니다. 실제 운영자 계정으로 로그인하면 사용할 수 있습니다.';
+      box.appendChild(noticeEl);
+
+      container.appendChild(box);
+    }
+
+    async function onhadaOpenAdminManagerPreview(index) {
+      // D1: admin 인증 확인 - manager/비회원 상태에서는 열리지 않는다.
+      if (isAdminAuthenticated !== true) return;
+
+      // 모달 중복 열기 방지.
+      if (onhadaAdminManagerPreviewOpen) return;
+
+      // D2: onhadaAdminExhibitions에 실제 존재하는 index인지 검증.
+      const exhibition = onhadaAdminExhibitions[index];
+      if (!exhibition) return;
+
+      // D3: 외부(Lovable) 전시관은 미리보기 대상이 아니다.
+      if (exhibition.is_external) return;
+
+      const overlay = document.getElementById('onhada-admin-manager-preview-modal');
+      const bodyEl = document.getElementById('onhada-admin-manager-preview-body');
+      const closeBtn = document.getElementById('onhada-admin-manager-preview-close');
+      if (!overlay || !bodyEl) return;
+
+      onhadaAdminManagerPreviewRequestSeq += 1;
+      const requestSeq = onhadaAdminManagerPreviewRequestSeq;
+
+      // 매번 처음 상태로 새로 만든다(item 26).
+      bodyEl.innerHTML = "";
+      onhadaRenderAdminManagerPreviewHeader(bodyEl, exhibition);
+
+      const artworksBox = document.createElement('div');
+      artworksBox.style.cssText = "margin-bottom: 24px;";
+      const artworksHeading = document.createElement('h3');
+      artworksHeading.style.cssText = "color:#fff; margin-bottom:10px;";
+      artworksHeading.textContent = '작품 목록';
+      artworksBox.appendChild(artworksHeading);
+      const artworksListEl = document.createElement('div');
+      const loadingMsg = document.createElement('p');
+      loadingMsg.style.cssText = "color:var(--text-gray); font-size:0.9rem;";
+      loadingMsg.textContent = "작품 목록을 불러오는 중입니다...";
+      artworksListEl.appendChild(loadingMsg);
+      artworksBox.appendChild(artworksListEl);
+      bodyEl.appendChild(artworksBox);
+
+      onhadaRenderAdminManagerPreviewTextForm(bodyEl);
+      onhadaRenderAdminManagerPreviewImageForm(bodyEl);
+
+      onhadaAdminManagerPreviewOpen = true;
+      onhadaAdminManagerPreviewPreviousFocus = document.activeElement;
+
+      overlay.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onhadaAdminManagerPreviewKeydownHandler);
+
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+
+      // D4/22: 작품 목록은 관리자 전용 읽기 함수의 실제 조회 결과만 사용한다
+      // (가짜 작품을 만들지 않음). 이 모달에서 발생하는 유일한 작품 관련 API 호출이다.
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.db.getArtworksForAdminExhibition(exhibition.id);
+      } catch (err) {
+        result = { ok: false, artworks: [], error: null };
+      }
+
+      // stale 가드: 응답이 오는 사이 모달을 닫았거나 새 요청이 시작됐으면 무시한다.
+      if (requestSeq !== onhadaAdminManagerPreviewRequestSeq || !onhadaAdminManagerPreviewOpen) return;
+
+      if (!result.ok) {
+        artworksListEl.innerHTML = "";
+        const errMsg = document.createElement('p');
+        errMsg.style.cssText = "color:var(--text-gray); font-size:0.9rem;";
+        errMsg.textContent = (result.error && result.error.message) || "작품 목록을 불러오지 못했습니다.";
+        artworksListEl.appendChild(errMsg);
+        return;
+      }
+
+      onhadaRenderAdminManagerPreviewArtworksList(artworksListEl, result.artworks);
+    }
+
+    function onhadaCloseAdminManagerPreview() {
+      if (!onhadaAdminManagerPreviewOpen) return;
+      onhadaAdminManagerPreviewOpen = false;
+
+      // 진행 중이던 요청을 무효화한다(이 모달은 이미지가 없어 blob은 항상 비어 있지만,
+      // 관람 화면 미리보기와 동일한 정리 시점을 지킨다).
+      onhadaAdminManagerPreviewRequestSeq += 1;
+      onhadaRevokeAdminManagerPreviewBlobUrls();
+
+      const overlay = document.getElementById('onhada-admin-manager-preview-modal');
+      const bodyEl = document.getElementById('onhada-admin-manager-preview-body');
+      if (overlay) overlay.style.display = 'none';
+      // 다음에 열 때 처음 상태로 시작하도록 완전히 비운다(item 26).
+      if (bodyEl) bodyEl.innerHTML = "";
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onhadaAdminManagerPreviewKeydownHandler);
+
+      const toFocus = onhadaAdminManagerPreviewPreviousFocus;
+      onhadaAdminManagerPreviewPreviousFocus = null;
       if (toFocus && typeof toFocus.focus === 'function') toFocus.focus();
     }
 
@@ -6086,16 +6822,29 @@
         dateEl.textContent = "생성일: " + onhadaFormatDate(ex.created_at);
         row.appendChild(dateEl);
 
-        // A: 외부(Lovable) 전시관에는 표시하지 않는다. 실제 UUID는 이 클로저에서만
-        // 참조하고 DOM(data-*/value)에는 전혀 쓰지 않는다 - 대신 현재 렌더 시점의
-        // onhadaAdminExhibitions 배열 인덱스만 넘긴다.
+        // A: 외부(Lovable) 전시관에는 두 버튼 모두 표시하지 않는다. 실제
+        // UUID는 이 클로저에서만 참조하고 DOM(data-*/value)에는 전혀 쓰지
+        // 않는다 - 대신 현재 렌더 시점의 onhadaAdminExhibitions 배열
+        // 인덱스만 넘긴다.
         if (!ex.is_external) {
-          const previewBtn = document.createElement('button');
-          previewBtn.className = 'btn-hero-secondary';
-          previewBtn.style.cssText = "margin-top: 10px; font-size: 0.85rem; padding: 6px 16px;";
-          previewBtn.textContent = '입구 미리보기';
-          previewBtn.addEventListener('click', () => onhadaOpenAdminEntrancePreview(index));
-          row.appendChild(previewBtn);
+          const previewBtnRow = document.createElement('div');
+          previewBtnRow.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin-top: 10px;";
+
+          const entrancePreviewBtn = document.createElement('button');
+          entrancePreviewBtn.className = 'btn-hero-secondary';
+          entrancePreviewBtn.style.cssText = "font-size: 0.85rem; padding: 6px 16px;";
+          entrancePreviewBtn.textContent = '관람 화면 미리보기';
+          entrancePreviewBtn.addEventListener('click', () => onhadaOpenAdminEntrancePreview(index));
+          previewBtnRow.appendChild(entrancePreviewBtn);
+
+          const managerPreviewBtn = document.createElement('button');
+          managerPreviewBtn.className = 'btn-hero-secondary';
+          managerPreviewBtn.style.cssText = "font-size: 0.85rem; padding: 6px 16px;";
+          managerPreviewBtn.textContent = '운영 화면 미리보기';
+          managerPreviewBtn.addEventListener('click', () => onhadaOpenAdminManagerPreview(index));
+          previewBtnRow.appendChild(managerPreviewBtn);
+
+          row.appendChild(previewBtnRow);
         }
 
         if (listEl) listEl.appendChild(row);
