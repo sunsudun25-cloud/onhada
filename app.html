@@ -3417,6 +3417,24 @@
     </div>
   </div>
 
+  <!-- 관리자 전용 - private/preparing 내부 전시관 입구 미리보기.
+       public 전환 없이 공개 입구와 동일한 내용을 관리자에게만 보여준다. -->
+  <div class="admin-login-overlay" id="onhada-admin-entrance-preview-modal" role="dialog" aria-modal="true" aria-labelledby="onhada-admin-entrance-preview-title">
+    <div class="admin-login-box" id="onhada-admin-entrance-preview-dialog" style="max-width: 560px; width: 92%; text-align: left; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <h3 id="onhada-admin-entrance-preview-title" style="font-size: 1.3rem; color: #fff;">입구 미리보기</h3>
+        <button class="btn-hero-secondary" id="onhada-admin-entrance-preview-close-x" onclick="onhadaCloseAdminEntrancePreview()" style="padding: 4px 12px; font-size: 0.85rem;" aria-label="미리보기 닫기">✕</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 18px;">이 화면은 관리자에게만 보이며, 공개 전환 없이 실제 공개 입구와 동일한 내용을 미리 확인합니다.</p>
+
+      <div id="onhada-admin-entrance-preview-body"></div>
+
+      <div style="margin-top: 22px; text-align: right;">
+        <button class="btn-hero-secondary" id="onhada-admin-entrance-preview-close" onclick="onhadaCloseAdminEntrancePreview()">미리보기 닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 알림 경고 팝업 -->
   <div class="alert-dialog-overlay" id="alert-dialog">
     <div class="alert-dialog-box">
@@ -3432,10 +3450,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260809-2"></script>
-  <script src="js/auth-service.js?v=20260809-2"></script>
-  <script src="js/db-service.js?v=20260809-2"></script>
-  <script src="js/storage-service.js?v=20260809-2"></script>
+  <script src="js/supabase-client.js?v=20260809-3"></script>
+  <script src="js/auth-service.js?v=20260809-3"></script>
+  <script src="js/db-service.js?v=20260809-3"></script>
+  <script src="js/storage-service.js?v=20260809-3"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4147,17 +4165,21 @@
       return '';
     }
 
-    // Supabase 내부 전시관 공통 입구 화면 렌더. cover_image_path는 이번 1차
-    // 구현에서 절대 사용하지 않는다 - 대표 이미지 전용 Storage 정책이 아직
-    // 없고, 임의 DB 경로를 img.src에 넣지 않기 위함이다. 항상 유형별 CSS
-    // 기본 비주얼만 쓴다. 모든 DB 문자열은 createElement/textContent로만
-    // 넣고, UUID/Storage 경로/slug는 화면에 전혀 표시하지 않는다.
-    function onhadaRenderHallEntrance(exhibition) {
-      const container = document.getElementById('hall-entrance-container');
+    // Supabase 내부 전시관 공통 입구 "콘텐츠"만 렌더하는 공유 헬퍼. 공개
+    // 입구(hall-entrance-container)와 관리자 미리보기(onhada-admin-entrance-preview-body)가
+    // 이 함수를 그대로 재사용한다. cover_image_path는 이번 1차 구현에서
+    // 절대 사용하지 않는다 - 대표 이미지 전용 Storage 정책이 아직 없고,
+    // 임의 DB 경로를 img.src에 넣지 않기 위함이다. 항상 유형별 CSS 기본
+    // 비주얼만 쓴다. 모든 DB 문자열은 createElement/textContent로만 넣고,
+    // UUID/Storage 경로/slug는 화면에 전혀 표시하지 않는다. 액션 버튼(입장하기/
+    // 목록으로/미리보기 닫기 등)은 호출자가 각자 이어서 붙인다.
+    function onhadaBuildHallEntranceContent(exhibition, options) {
+      const opts = (options && typeof options === 'object') ? options : {};
+      const container = opts.container;
       if (!container) return;
 
       container.innerHTML = "";
-      container.className = 'hall-entrance-container';
+      container.className = opts.baseClassName || 'hall-entrance-container';
 
       const themeClass = onhadaGetHallEntranceThemeClass(exhibition.exhibition_type);
       if (themeClass) container.classList.add(themeClass);
@@ -4196,6 +4218,16 @@
       descEl.className = 'hall-entrance-description';
       descEl.textContent = exhibition.description || 'AI와 디지털 도구로 만든 다양한 이야기를 만나보세요.';
       container.appendChild(descEl);
+    }
+
+    // 공개 관람 화면 전용 입구 렌더 - 콘텐츠는 onhadaBuildHallEntranceContent()를
+    // 그대로 재사용하고, 여기서는 공개 흐름 전용 액션(입장하기/전체 목록으로)만 붙인다.
+    // 기존 동작(마크업/클래스/버튼)은 리팩터링 전과 동일하게 유지한다.
+    function onhadaRenderHallEntrance(exhibition) {
+      const container = document.getElementById('hall-entrance-container');
+      if (!container) return;
+
+      onhadaBuildHallEntranceContent(exhibition, { container: container });
 
       const actions = document.createElement('div');
       actions.className = 'hall-entrance-actions';
@@ -4970,6 +5002,8 @@
     let onhadaPublicArtworkBlobUrls = new Map();
     let onhadaAdminExhibitions = [];
     let onhadaAdminExhibitionsRequestSeq = 0;
+    let onhadaAdminEntrancePreviewOpen = false;
+    let onhadaAdminEntrancePreviewPreviousFocus = null;
     let onhadaAdminOperatorProfiles = [];
     let onhadaAdminOperatorRequestSeq = 0;
     let onhadaAdminSelectedAssignmentExhibitionId = null;
@@ -5898,6 +5932,68 @@
       onhadaUpdateAdminExhibitionNamePreview();
     }
 
+    // 관리자 전용 입구 미리보기 모달. private/preparing 내부 전시관도
+    // 공개 전환 없이 실제 공개 입구와 동일한 콘텐츠(onhadaBuildHallEntranceContent)를
+    // 미리 볼 수 있게 한다. visibility/operation_status는 절대 바꾸지 않고,
+    // onhadaAdminExhibitions 캐시 배열만 읽어 추가 DB/API 호출 없이 렌더한다.
+    // 공개 입구 화면(hall-entrance-container, activeSupabaseExhibitionId,
+    // onhadaPublicArtworksRequestSeq, onhadaPublicArtworkBlobUrls)과는 완전히
+    // 분리되어 있으며 서로 건드리지 않는다.
+    function onhadaAdminEntrancePreviewKeydownHandler(evt) {
+      if (evt.key === 'Escape' || evt.key === 'Esc') {
+        evt.preventDefault();
+        onhadaCloseAdminEntrancePreview();
+      }
+    }
+
+    function onhadaOpenAdminEntrancePreview(index) {
+      // D1: admin 인증 확인 - manager/비회원 상태에서는 열리지 않는다.
+      if (isAdminAuthenticated !== true) return;
+
+      // 모달 중복 열기 방지.
+      if (onhadaAdminEntrancePreviewOpen) return;
+
+      // D2: onhadaAdminExhibitions에 실제 존재하는 index인지 검증.
+      const exhibition = onhadaAdminExhibitions[index];
+      if (!exhibition) return;
+
+      // D3: 외부(Lovable) 전시관은 미리보기 대상이 아니다.
+      if (exhibition.is_external) return;
+
+      const overlay = document.getElementById('onhada-admin-entrance-preview-modal');
+      const bodyEl = document.getElementById('onhada-admin-entrance-preview-body');
+      const closeBtn = document.getElementById('onhada-admin-entrance-preview-close');
+      if (!overlay || !bodyEl) return;
+
+      // D4: 추가 DB/API 호출 없이 현재 관리자 목록 캐시 객체만 사용한다.
+      onhadaBuildHallEntranceContent(exhibition, { container: bodyEl });
+
+      onhadaAdminEntrancePreviewOpen = true;
+      onhadaAdminEntrancePreviewPreviousFocus = document.activeElement;
+
+      overlay.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onhadaAdminEntrancePreviewKeydownHandler);
+
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+    }
+
+    function onhadaCloseAdminEntrancePreview() {
+      if (!onhadaAdminEntrancePreviewOpen) return;
+      onhadaAdminEntrancePreviewOpen = false;
+
+      const overlay = document.getElementById('onhada-admin-entrance-preview-modal');
+      const bodyEl = document.getElementById('onhada-admin-entrance-preview-body');
+      if (overlay) overlay.style.display = 'none';
+      if (bodyEl) bodyEl.innerHTML = "";
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onhadaAdminEntrancePreviewKeydownHandler);
+
+      const toFocus = onhadaAdminEntrancePreviewPreviousFocus;
+      onhadaAdminEntrancePreviewPreviousFocus = null;
+      if (toFocus && typeof toFocus.focus === 'function') toFocus.focus();
+    }
+
     // renderAllViews()에는 포함하지 않는다 - "클라우드 전시관 관리" 탭을
     // 열 때만 명시적으로 호출한다.
     async function renderAdminCloudExhibitions() {
@@ -5943,7 +6039,7 @@
       if (statusEl) statusEl.textContent = `클라우드 전시관 ${exhibitions.length}건`;
       if (listEl) listEl.innerHTML = "";
 
-      exhibitions.forEach(ex => {
+      exhibitions.forEach((ex, index) => {
         const row = document.createElement('div');
         row.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 16px; margin-bottom: 12px;";
 
@@ -5989,6 +6085,18 @@
         dateEl.style.cssText = "color:var(--text-gray); font-size:0.8rem;";
         dateEl.textContent = "생성일: " + onhadaFormatDate(ex.created_at);
         row.appendChild(dateEl);
+
+        // A: 외부(Lovable) 전시관에는 표시하지 않는다. 실제 UUID는 이 클로저에서만
+        // 참조하고 DOM(data-*/value)에는 전혀 쓰지 않는다 - 대신 현재 렌더 시점의
+        // onhadaAdminExhibitions 배열 인덱스만 넘긴다.
+        if (!ex.is_external) {
+          const previewBtn = document.createElement('button');
+          previewBtn.className = 'btn-hero-secondary';
+          previewBtn.style.cssText = "margin-top: 10px; font-size: 0.85rem; padding: 6px 16px;";
+          previewBtn.textContent = '입구 미리보기';
+          previewBtn.addEventListener('click', () => onhadaOpenAdminEntrancePreview(index));
+          row.appendChild(previewBtn);
+        }
 
         if (listEl) listEl.appendChild(row);
       });
