@@ -477,6 +477,34 @@
         return true;
     }
 
+    // PDF 문서 전용 비공개 path validator. isValidManagedImagePath()는 건드리지
+    // 않고 완전히 별도로 둔다. 폴더 구간(UUID) 검증 정규식은 이미지와 동일한
+    // MANAGED_IMAGE_PATH_UUID_RE를 그대로 재사용하되, 파일명 확장자만 .pdf로 한정한다.
+    var MANAGED_DOCUMENT_PDF_PATH_FILE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$/i;
+
+    function isValidManagedDocumentPdfPath(mediaPath, exhibitionId) {
+        if (typeof mediaPath !== 'string' || mediaPath.length === 0) return false;
+        if (mediaPath.indexOf('://') !== -1) return false;
+        if (mediaPath.charAt(0) === '/') return false;
+        if (mediaPath.indexOf('\\') !== -1) return false;
+        if (mediaPath.indexOf(' ') !== -1) return false;
+        if (mediaPath.indexOf('?') !== -1) return false;
+        if (mediaPath.indexOf('#') !== -1) return false;
+        if (mediaPath.indexOf('..') !== -1) return false;
+
+        var segments = mediaPath.split('/');
+        if (segments.length !== 2) return false;
+
+        var exhibitionSegment = segments[0];
+        var fileSegment = segments[1];
+
+        if (exhibitionSegment !== exhibitionId) return false;
+        if (!MANAGED_IMAGE_PATH_UUID_RE.test(exhibitionSegment)) return false;
+        if (!MANAGED_DOCUMENT_PDF_PATH_FILE_RE.test(fileSegment)) return false;
+
+        return true;
+    }
+
     // 이 함수는 storage-service.js를 직접 호출하지 않는다. 이미지 업로드는
     // 이 함수 호출 이전에 이미 완료되어 media_path로 전달되어야 하며,
     // 이 INSERT가 실패했을 때 방금 올린 Storage 파일을 보상 삭제하는 책임은
@@ -588,6 +616,170 @@
             return { ok: true, artwork: data, error: null };
         } catch (err) {
             return { ok: false, artwork: null, error: safeError('artwork_insert_failed', '작품 등록 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 통합 작품 등록 - image/document 공용. 이번 1차 구현에서는 video를
+    // unsupported_media_type으로 차단한다(MP4 Storage/썸네일 캡처 구현 후
+    // 별도 확장 예정). 기존 createManagedArtwork(text)/createManagedImageArtwork는
+    // 기존 데이터·화면 호환용으로 그대로 두고 이 함수에서 대체하지 않는다.
+    //
+    // 이 함수도 storage-service.js를 직접 호출하지 않는다. 파일 업로드는 이
+    // 함수 호출 이전에 이미 완료되어 media_path로 전달되어야 하며, 이 INSERT가
+    // 실패했을 때 방금 올린 Storage 파일을 보상 삭제하는 책임은 이 함수가
+    // 아니라 호출자(제출 오케스트레이터)가 진다.
+    async function createManagedUnifiedArtwork(exhibitionId, input) {
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artwork: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        // 1. exhibitionId UUID 형식
+        if (!isValidUuid(exhibitionId)) {
+            return { ok: false, artwork: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        // 2. input 객체 여부
+        if (!input || typeof input !== 'object') {
+            return { ok: false, artwork: null, error: safeError('invalid_input', '입력값이 올바르지 않습니다.') };
+        }
+
+        // input을 그대로 스프레드하지 않고 화이트리스트 필드만 꺼낸다.
+        const mediaType = typeof input.media_type === 'string' ? input.media_type : '';
+        const title = typeof input.title === 'string' ? input.title.trim() : '';
+        const artistDisplayName = typeof input.artist_display_name === 'string' ? input.artist_display_name.trim() : '';
+        const categoryId = typeof input.category_id === 'string' ? input.category_id.trim() : '';
+        const descriptionTrimmed = typeof input.description === 'string' ? input.description.trim() : '';
+        const consentConfirmed = input.consent_confirmed === true;
+        const mediaPath = typeof input.media_path === 'string' ? input.media_path : '';
+
+        // 3. media_type이 image 또는 document인지 (video/text/audio/mixed는 차단)
+        if (['image', 'document'].indexOf(mediaType) === -1) {
+            return { ok: false, artwork: null, error: safeError('unsupported_media_type', '이미지 또는 문서 형식만 등록할 수 있습니다.') };
+        }
+
+        // 4. 작품명
+        if (!title || title.length > 100) {
+            return { ok: false, artwork: null, error: safeError('invalid_title', '작품명을 100자 이내로 입력해 주세요.') };
+        }
+
+        // 5. 작가 표시명
+        if (!artistDisplayName || artistDisplayName.length > 50) {
+            return { ok: false, artwork: null, error: safeError('invalid_artist_display_name', '작가 표시명을 50자 이내로 입력해 주세요.') };
+        }
+
+        // 6. 카테고리 (형식만, 실제 존재 여부는 13번에서 조회 확인)
+        if (!categoryId) {
+            return { ok: false, artwork: null, error: safeError('invalid_category', '카테고리를 선택해 주세요.') };
+        }
+
+        // 7. 작품 설명 (선택)
+        if (descriptionTrimmed.length > 500) {
+            return { ok: false, artwork: null, error: safeError('invalid_description', '작품 설명은 500자를 초과할 수 없습니다.') };
+        }
+
+        // 8. 전시 동의 - UI 체크박스를 우회하더라도 여기서 다시 한번 강제한다.
+        if (!consentConfirmed) {
+            return { ok: false, artwork: null, error: safeError('consent_required', '전시 동의 확인이 필요합니다.') };
+        }
+
+        // 9. media_path 필수(형식 상세 검증은 14번에서)
+        if (!mediaPath) {
+            return { ok: false, artwork: null, error: safeError('invalid_media_path', '작품 파일 경로 정보가 올바르지 않습니다.') };
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, artwork: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        // 10. 로그인 상태
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, artwork: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        // 11. 운영자 계정 확인
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, artwork: null, error: safeError('role_not_allowed', '작품 등록은 운영자 계정만 가능합니다.') };
+        }
+
+        // 12. 담당 전시관 확인
+        const managedResult = await getMyManagedExhibitions();
+
+        if (!managedResult.ok) {
+            return { ok: false, artwork: null, error: managedResult.error };
+        }
+
+        const isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionId; });
+
+        if (!isManaged) {
+            return { ok: false, artwork: null, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        // 13. 카테고리 실제 존재 여부
+        const categoriesResult = await getCategories();
+
+        if (!categoriesResult.ok) {
+            return { ok: false, artwork: null, error: categoriesResult.error };
+        }
+
+        const categoryExists = categoriesResult.categories.some(function (cat) { return cat.id === categoryId; });
+
+        if (!categoryExists) {
+            return { ok: false, artwork: null, error: safeError('invalid_category', '카테고리를 선택해 주세요.') };
+        }
+
+        // 14. media_path가 exhibitionId 폴더와 정확히 일치하는지 + media_type별 규칙
+        //     image   : 기존 이미지 path(jpg/png/webp)만 허용, pdf 경로는 거부
+        //     document: PDF path 또는 기존 이미지 path 모두 허용
+        const isImagePath = isValidManagedImagePath(mediaPath, exhibitionId);
+        const isPdfPath = isValidManagedDocumentPdfPath(mediaPath, exhibitionId);
+
+        if (mediaType === 'image') {
+            if (!isImagePath) {
+                return { ok: false, artwork: null, error: safeError('invalid_media_path', '이미지 경로 정보가 올바르지 않습니다.') };
+            }
+        } else {
+            // mediaType === 'document'
+            if (!isImagePath && !isPdfPath) {
+                return { ok: false, artwork: null, error: safeError('invalid_media_path', '문서 경로 정보가 올바르지 않습니다.') };
+            }
+        }
+
+        // thumbnail_url : image 경로(이미지형 image/document 공통)는 media_path와
+        // 동일하게, PDF 경로(document 전용)는 null로 둔다(1차 버전).
+        const payload = {
+            exhibition_id: exhibitionId,
+            category_id: categoryId,
+            title: title,
+            media_type: mediaType,
+            artist_display_name: artistDisplayName,
+            description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
+            thumbnail_url: isImagePath ? mediaPath : null,
+            media_url: mediaPath,
+            external_url: null,
+            status: 'pending',
+            consent_confirmed: true,
+            consent_scope: 'online_exhibition_confirmed_by_operator',
+            submitted_by: context.userId
+        };
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .insert(payload)
+                .select('id, exhibition_id, category_id, title, media_type, artist_display_name, status, consent_confirmed, created_at')
+                .single();
+
+            if (error) {
+                return { ok: false, artwork: null, error: safeError('artwork_create_failed', '작품 등록에 실패했습니다.') };
+            }
+
+            return { ok: true, artwork: data, error: null };
+        } catch (err) {
+            return { ok: false, artwork: null, error: safeError('unexpected_error', '작품 등록 중 오류가 발생했습니다.') };
         }
     }
 
@@ -1326,6 +1518,7 @@
         getPublicArtworksForExhibition: getPublicArtworksForExhibition,
         createManagedArtwork: createManagedArtwork,
         createManagedImageArtwork: createManagedImageArtwork,
+        createManagedUnifiedArtwork: createManagedUnifiedArtwork,
         getPendingArtworksForAdmin: getPendingArtworksForAdmin,
         approveArtworkAsAdmin: approveArtworkAsAdmin,
         rejectArtworkAsAdmin: rejectArtworkAsAdmin,
