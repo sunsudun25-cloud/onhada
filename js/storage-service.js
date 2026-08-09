@@ -399,9 +399,233 @@
         }
     }
 
+    // =====================================================================
+    // PDF 문서(artwork-documents 버킷) 전용 - 위 이미지(artwork-assets) 관련
+    // 상수/검증 함수와는 완전히 분리해서 둔다. 기존 ALLOWED_MIME_EXT/
+    // isValidAssetPath 등 이미지용 검증기를 느슨하게 확장하지 않는다.
+    // =====================================================================
+
+    var DOCUMENT_MAX_FILE_SIZE = 20 * 1024 * 1024; // 20971520, artwork-documents 버킷 설정과 동일
+    var DOCUMENT_MIME_TYPE = 'application/pdf';
+    var DOCUMENT_FILE_NAME_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$/i;
+
+    function isValidDocumentFileName(value) {
+        return typeof value === 'string' && DOCUMENT_FILE_NAME_RE.test(value);
+    }
+
+    // removeManagedArtworkDocument()/downloadArtworkDocument() 공용 - 엄격한
+    // PDF 전용 경로 검증. URL/선행 슬래시/역슬래시/공백/query/fragment/상위
+    // 경로 이동/2개를 초과하는 경로 구간을 모두 거부한다(downloadArtworkAsset의
+    // isValidAssetPath와 동일한 엄격도).
+    function isValidDocumentPath(path) {
+        if (typeof path !== 'string' || path.length === 0) return false;
+        if (path.indexOf('://') !== -1) return false;
+        if (path.charAt(0) === '/') return false;
+        if (path.indexOf('\\') !== -1) return false;
+        if (path.indexOf(' ') !== -1) return false;
+        if (path.indexOf('?') !== -1) return false;
+        if (path.indexOf('#') !== -1) return false;
+        if (path.indexOf('..') !== -1) return false;
+
+        var segments = path.split('/');
+        if (segments.length !== 2) return false;
+
+        return isUuidLike(segments[0]) && isValidDocumentFileName(segments[1]);
+    }
+
+    function buildDocumentPath(exhibitionId) {
+        return exhibitionId + '/' + crypto.randomUUID() + '.pdf';
+    }
+
+    async function uploadManagedArtworkDocument(exhibitionId, file) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, path: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isUuidLike(exhibitionId)) {
+            return { ok: false, path: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        if (!(file instanceof File) && !(file instanceof Blob)) {
+            return { ok: false, path: null, error: safeError('invalid_file', '파일 정보가 올바르지 않습니다.') };
+        }
+
+        if (file.type !== DOCUMENT_MIME_TYPE) {
+            return { ok: false, path: null, error: safeError('unsupported_document_type', 'PDF 파일만 업로드할 수 있습니다.') };
+        }
+
+        if (!(file.size > 0)) {
+            return { ok: false, path: null, error: safeError('empty_file', '파일 내용이 비어 있습니다.') };
+        }
+
+        if (file.size > DOCUMENT_MAX_FILE_SIZE) {
+            return { ok: false, path: null, error: safeError('document_too_large', '문서 용량은 20MB를 초과할 수 없습니다.') };
+        }
+
+        var auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        var context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, path: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, path: null, error: safeError('role_not_allowed', '문서 업로드는 운영자 계정만 가능합니다.') };
+        }
+
+        var db = getDb();
+        if (!db || typeof db.getMyManagedExhibitions !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '전시관 조회 서비스를 사용할 수 없습니다.') };
+        }
+
+        var managedResult = await db.getMyManagedExhibitions();
+        if (!managedResult.ok) {
+            return { ok: false, path: null, error: managedResult.error };
+        }
+
+        var isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionId; });
+        if (!isManaged) {
+            return { ok: false, path: null, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '이 브라우저에서는 문서 업로드를 사용할 수 없습니다.') };
+        }
+
+        // 원본 file.name은 절대 경로 생성에 사용하지 않는다. 경로는 오직
+        // exhibitionId(폴더)와 crypto.randomUUID() + .pdf로만 구성한다.
+        // PDF는 이미지와 달리 Canvas 재인코딩/EXIF 제거를 하지 않고 원본
+        // Blob(File)을 그대로 업로드한다.
+        var path = buildDocumentPath(exhibitionId);
+
+        try {
+            var uploadResult = await client.storage
+                .from('artwork-documents')
+                .upload(path, file, {
+                    upsert: false,
+                    contentType: DOCUMENT_MIME_TYPE
+                });
+
+            if (uploadResult.error) {
+                return { ok: false, path: null, error: safeError('upload_failed', '문서 업로드에 실패했습니다.') };
+            }
+
+            return { ok: true, path: path, error: null };
+        } catch (err) {
+            return { ok: false, path: null, error: safeError('upload_failed', '문서 업로드 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 보상 삭제 전용. approved/hidden 상태 작품이 참조하는 파일의 삭제 차단은
+    // Storage RLS(storage_artwork_documents_delete_manager)가 최종 방어선이다.
+    // 이 함수는 소유(담당 전시관) 여부만 사전 확인하고, 실제 삭제 가부는
+    // 서버 정책에 맡긴다.
+    async function removeManagedArtworkDocument(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidDocumentPath(path)) {
+            return { ok: false, error: safeError('invalid_storage_path', '삭제할 파일 경로가 올바르지 않습니다.') };
+        }
+
+        var auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, error: safeError('storage_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        var context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, error: safeError('role_not_allowed', '파일 삭제는 운영자 계정만 가능합니다.') };
+        }
+
+        var segments = path.split('/');
+        var exhibitionSegment = segments[0];
+
+        var db = getDb();
+        if (!db || typeof db.getMyManagedExhibitions !== 'function') {
+            return { ok: false, error: safeError('storage_unavailable', '전시관 조회 서비스를 사용할 수 없습니다.') };
+        }
+
+        var managedResult = await db.getMyManagedExhibitions();
+        if (!managedResult.ok) {
+            return { ok: false, error: managedResult.error };
+        }
+
+        var isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionSegment; });
+        if (!isManaged) {
+            return { ok: false, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        try {
+            var removeResult = await client.storage.from('artwork-documents').remove([path]);
+
+            if (removeResult.error) {
+                return { ok: false, error: safeError('remove_failed', '파일 삭제에 실패했습니다.') };
+            }
+
+            return { ok: true, error: null };
+        } catch (err) {
+            return { ok: false, error: safeError('remove_failed', '파일 삭제 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 업로드/삭제와 달리 role 사전 확인을 하지 않는다. admin/manager/anon
+    // 모두 이 함수를 호출할 수 있으며, 실제로 그 경로를 읽을 권한이 있는지는
+    // storage.objects RLS(storage_artwork_documents_select_*)가 최종 판단한다.
+    // public URL이나 signed URL은 생성하지 않고, 항상 download()로 받은
+    // Blob만 반환한다. object URL 생성/정리는 이 서비스가 하지 않고 호출한
+    // UI가 필요할 때 만들고 정리한다.
+    async function downloadArtworkDocument(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, blob: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidDocumentPath(path)) {
+            return { ok: false, blob: null, error: safeError('invalid_storage_path', '문서 경로 정보가 올바르지 않습니다.') };
+        }
+
+        try {
+            var downloadResult = await client.storage.from('artwork-documents').download(path);
+
+            if (downloadResult.error || !downloadResult.data) {
+                return { ok: false, blob: null, error: safeError('download_failed', '문서를 불러오지 못했습니다.') };
+            }
+
+            var blob = downloadResult.data;
+
+            if (blob.type !== DOCUMENT_MIME_TYPE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_document', '문서 형식이 올바르지 않습니다.') };
+            }
+
+            if (!(blob.size > 0) || blob.size > DOCUMENT_MAX_FILE_SIZE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_document', '문서 용량이 올바르지 않습니다.') };
+            }
+
+            return { ok: true, blob: blob, mimeType: blob.type, size: blob.size, error: null };
+        } catch (err) {
+            return { ok: false, blob: null, error: safeError('download_failed', '문서 다운로드 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.storage = {
         uploadManagedArtworkImage: uploadManagedArtworkImage,
         removeManagedArtworkAsset: removeManagedArtworkAsset,
-        downloadArtworkAsset: downloadArtworkAsset
+        downloadArtworkAsset: downloadArtworkAsset,
+        uploadManagedArtworkDocument: uploadManagedArtworkDocument,
+        removeManagedArtworkDocument: removeManagedArtworkDocument,
+        downloadArtworkDocument: downloadArtworkDocument
     };
 })();
