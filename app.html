@@ -649,6 +649,131 @@
       box-shadow: 0 5px 15px rgba(255, 215, 0, 0.2);
     }
 
+    /* Supabase 신규 카드의 대표 이미지 대신 쓰는 유형별 기본 썸네일 (H) */
+    .hall-card-thumb-fallback {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 800;
+      text-align: center;
+      padding: 10px;
+    }
+
+    /* ============================================== */
+    /* Supabase 내부 전시관 공통 입구 화면 (C, D, E) */
+    /* ============================================== */
+    .hall-entrance-container {
+      max-width: 720px;
+      margin: 20px auto 50px;
+      padding-top: 20px;
+    }
+
+    .hall-entrance-visual {
+      width: 100%;
+      aspect-ratio: 21/9;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .hall-entrance-visual-label {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .hall-entrance-badge {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+
+    .hall-entrance-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .hall-entrance-org {
+      font-size: 0.95rem;
+      color: var(--text-gray);
+      margin-bottom: 14px;
+    }
+
+    .hall-entrance-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: #ddd;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+
+    .hall-entrance-description {
+      font-size: 1rem;
+      line-height: 1.7;
+      color: #ddd;
+      margin-bottom: 30px;
+      white-space: pre-wrap;
+    }
+
+    .hall-entrance-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* institution → 온하다 예술관: 골드·앰버 */
+    .hall-entrance-theme-institution .hall-entrance-visual,
+    .hall-img-box.hall-entrance-theme-institution {
+      background: linear-gradient(135deg, rgba(255,215,0,0.18) 0%, rgba(255,165,0,0.10) 100%);
+      border: 1px solid rgba(255,215,0,0.3);
+    }
+    .hall-entrance-theme-institution .hall-entrance-visual-label { color: #FFD700; }
+    .hall-entrance-theme-institution .hall-entrance-badge {
+      background: rgba(255,215,0,0.12);
+      border: 1px solid rgba(255,215,0,0.4);
+      color: #FFD700;
+    }
+
+    /* instructor → 온하다 창작관: 그린·민트 */
+    .hall-entrance-theme-instructor .hall-entrance-visual,
+    .hall-img-box.hall-entrance-theme-instructor {
+      background: linear-gradient(135deg, rgba(46,204,113,0.18) 0%, rgba(0,200,150,0.10) 100%);
+      border: 1px solid rgba(46,204,113,0.3);
+    }
+    .hall-entrance-theme-instructor .hall-entrance-visual-label { color: #2ecc71; }
+    .hall-entrance-theme-instructor .hall-entrance-badge {
+      background: rgba(46,204,113,0.12);
+      border: 1px solid rgba(46,204,113,0.4);
+      color: #2ecc71;
+    }
+
+    /* personal → 온하다 미래관: 퍼플·블루 */
+    .hall-entrance-theme-personal .hall-entrance-visual,
+    .hall-img-box.hall-entrance-theme-personal {
+      background: linear-gradient(135deg, rgba(138,43,226,0.18) 0%, rgba(65,105,225,0.10) 100%);
+      border: 1px solid rgba(138,43,226,0.3);
+    }
+    .hall-entrance-theme-personal .hall-entrance-visual-label { color: #bfa3ff; }
+    .hall-entrance-theme-personal .hall-entrance-badge {
+      background: rgba(138,43,226,0.12);
+      border: 1px solid rgba(138,43,226,0.4);
+      color: #bfa3ff;
+    }
+
     /* ============================================== */
     /* [미술관 전시장 내부 메이슨리 갤러리] */
     /* ============================================== */
@@ -2283,12 +2408,21 @@
         
         <!-- 작품 그리드 영역 (전시관 내부 입장시 노출) -->
         <div id="hall-artworks-section" style="margin-top: 50px; display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px; margin-bottom: 20px;">
-            <h3 id="hall-active-title" style="font-size: 1.5rem; font-weight: 800; color: #fff;">전시관 상세</h3>
-            <button class="btn-hero-secondary" onclick="closeHallView()" style="font-size: 0.85rem; padding: 6px 15px;">전시관 목록으로</button>
-          </div>
-          <div class="gallery-masonry" id="hall-gallery-container">
-            <!-- 작품 카드 로드 -->
+          <!-- Supabase 내부 전시관 전용 입구 화면. 로컬/Lovable 전시관은 이 영역을
+               항상 숨긴 상태로 두고 곧바로 hall-artworks-list-wrapper만 쓴다. -->
+          <div id="hall-entrance-container" class="hall-entrance-container" style="display: none;"></div>
+
+          <div id="hall-artworks-list-wrapper">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+              <h3 id="hall-active-title" style="font-size: 1.5rem; font-weight: 800; color: #fff;">전시관 상세</h3>
+              <div style="display: flex; gap: 10px;">
+                <button id="hall-back-to-entrance-btn" class="btn-hero-secondary" onclick="onhadaBackToHallEntrance()" style="font-size: 0.85rem; padding: 6px 15px; display: none;">입구로 돌아가기</button>
+                <button class="btn-hero-secondary" onclick="closeHallView()" style="font-size: 0.85rem; padding: 6px 15px;">전시관 목록으로</button>
+              </div>
+            </div>
+            <div class="gallery-masonry" id="hall-gallery-container">
+              <!-- 작품 카드 로드 -->
+            </div>
           </div>
         </div>
       </div>
@@ -3298,10 +3432,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260809-1"></script>
-  <script src="js/auth-service.js?v=20260809-1"></script>
-  <script src="js/db-service.js?v=20260809-1"></script>
-  <script src="js/storage-service.js?v=20260809-1"></script>
+  <script src="js/supabase-client.js?v=20260809-2"></script>
+  <script src="js/auth-service.js?v=20260809-2"></script>
+  <script src="js/db-service.js?v=20260809-2"></script>
+  <script src="js/storage-service.js?v=20260809-2"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -3659,6 +3793,7 @@
           center: ex.organization_name || '',
           tag: ex.tag || '',
           img: ex.cover_image_path || '',
+          exhibitionType: ex.exhibition_type || '',
           count: validArtworkCount || 0,
           authors: validParticipantCount || 0,
           isRecomm: false,
@@ -3736,10 +3871,16 @@
 
           const imgBox = document.createElement('div');
           imgBox.className = 'hall-img-box';
-          const img = document.createElement('img');
-          img.src = hall.img;
-          img.alt = hall.title;
-          imgBox.appendChild(img);
+          // H/E: cover_image_path는 이번 1차 구현에서 전혀 사용하지 않는다
+          // (대표 이미지 전용 Storage 정책이 아직 없고, 임의 DB 경로를
+          // img.src에 넣지 않기 위함). 값 존재 여부와 무관하게 항상 유형별
+          // CSS 기본 썸네일만 보여준다. DB 문자열은 textContent로만 넣는다.
+          const themeClass = onhadaGetHallEntranceThemeClass(hall.exhibitionType);
+          if (themeClass) imgBox.classList.add(themeClass);
+          const fallback = document.createElement('div');
+          fallback.className = 'hall-card-thumb-fallback hall-entrance-visual-label';
+          fallback.textContent = onhadaGetHallEntranceTypeLabel(hall.exhibitionType);
+          imgBox.appendChild(fallback);
           imgBox.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
           card.appendChild(imgBox);
 
@@ -3889,9 +4030,17 @@
     function enterSpecificHall(id) {
       const matchedHall = platformHalls.find(h => h.id === id);
       if (matchedHall && matchedHall.externalUrl) {
+        // iframe 모달은 hall-artworks-section 자체를 건드리지 않으므로,
+        // Supabase 공개 관람 중 남아있을 수 있는 blob URL만 최소 정리한다.
+        onhadaRevokePublicArtworkBlobUrls();
         openExternalIframeModal(matchedHall.externalUrl, matchedHall.title);
         return;
       }
+
+      // 내부(로컬) 전시관을 렌더하기 직전 - Supabase 입구/작품 화면의 UI
+      // 상태(입구 컨테이너, 작품 wrapper, 입구로 돌아가기 버튼, 관람 상태)를
+      // 명시적으로 원복한다.
+      onhadaResetSupabaseHallUiState();
 
       activeHallId = id;
       const titleEl = document.getElementById('hall-active-title');
@@ -3966,19 +4115,120 @@
       onhadaRevokePublicArtworkBlobUrls();
     });
 
+    // 로컬(enterSpecificHall)/전체 목록(closeHallView) 전환 시 Supabase
+    // 입구·작품 화면의 UI 상태를 공통으로 원복한다. 입구 단계 추가로 늘어난
+    // hall-entrance-container/hall-artworks-list-wrapper/hall-back-to-entrance-btn
+    // 표시 상태와 Supabase 관람 상태(요청 시퀀스/활성 전시관 id/blob)를 한 번에 정리한다.
+    function onhadaResetSupabaseHallUiState() {
+      const entranceEl = document.getElementById('hall-entrance-container');
+      const listWrapperEl = document.getElementById('hall-artworks-list-wrapper');
+      const backBtnEl = document.getElementById('hall-back-to-entrance-btn');
+
+      if (entranceEl) entranceEl.style.display = 'none';
+      if (listWrapperEl) listWrapperEl.style.display = 'block';
+      if (backBtnEl) backBtnEl.style.display = 'none';
+
+      onhadaPublicArtworksRequestSeq += 1;
+      activeSupabaseExhibitionId = null;
+      onhadaRevokePublicArtworkBlobUrls();
+    }
+
+    // 전시관 유형 → 한글 명칭/입구 테마 클래스 매핑. ONHADA_EXHIBITION_TYPE_PREFIX
+    // (전시관 생성 폼의 확정 명명 규칙 접두사)를 그대로 재사용해 입구 화면과
+    // 카드 기본 썸네일이 동일한 명칭을 쓰도록 한다.
+    function onhadaGetHallEntranceTypeLabel(exhibitionType) {
+      return ONHADA_EXHIBITION_TYPE_PREFIX[exhibitionType] || '온하다 전시관';
+    }
+
+    function onhadaGetHallEntranceThemeClass(exhibitionType) {
+      if (exhibitionType === 'institution') return 'hall-entrance-theme-institution';
+      if (exhibitionType === 'instructor') return 'hall-entrance-theme-instructor';
+      if (exhibitionType === 'personal') return 'hall-entrance-theme-personal';
+      return '';
+    }
+
+    // Supabase 내부 전시관 공통 입구 화면 렌더. cover_image_path는 이번 1차
+    // 구현에서 절대 사용하지 않는다 - 대표 이미지 전용 Storage 정책이 아직
+    // 없고, 임의 DB 경로를 img.src에 넣지 않기 위함이다. 항상 유형별 CSS
+    // 기본 비주얼만 쓴다. 모든 DB 문자열은 createElement/textContent로만
+    // 넣고, UUID/Storage 경로/slug는 화면에 전혀 표시하지 않는다.
+    function onhadaRenderHallEntrance(exhibition) {
+      const container = document.getElementById('hall-entrance-container');
+      if (!container) return;
+
+      container.innerHTML = "";
+      container.className = 'hall-entrance-container';
+
+      const themeClass = onhadaGetHallEntranceThemeClass(exhibition.exhibition_type);
+      if (themeClass) container.classList.add(themeClass);
+
+      const badge = document.createElement('span');
+      badge.className = 'hall-entrance-badge';
+      badge.textContent = onhadaGetHallEntranceTypeLabel(exhibition.exhibition_type);
+      container.appendChild(badge);
+
+      const visual = document.createElement('div');
+      visual.className = 'hall-entrance-visual';
+      const visualLabel = document.createElement('span');
+      visualLabel.className = 'hall-entrance-visual-label';
+      visualLabel.textContent = onhadaGetHallEntranceTypeLabel(exhibition.exhibition_type);
+      visual.appendChild(visualLabel);
+      container.appendChild(visual);
+
+      const titleEl = document.createElement('h2');
+      titleEl.className = 'hall-entrance-title';
+      titleEl.textContent = exhibition.title || '전시관';
+      container.appendChild(titleEl);
+
+      const orgEl = document.createElement('p');
+      orgEl.className = 'hall-entrance-org';
+      orgEl.textContent = exhibition.organization_name || '온하다와 함께하는 창작전시관';
+      container.appendChild(orgEl);
+
+      if (exhibition.tag) {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'hall-entrance-tag';
+        tagEl.textContent = exhibition.tag;
+        container.appendChild(tagEl);
+      }
+
+      const descEl = document.createElement('p');
+      descEl.className = 'hall-entrance-description';
+      descEl.textContent = exhibition.description || 'AI와 디지털 도구로 만든 다양한 이야기를 만나보세요.';
+      container.appendChild(descEl);
+
+      const actions = document.createElement('div');
+      actions.className = 'hall-entrance-actions';
+
+      const enterBtn = document.createElement('button');
+      enterBtn.className = 'btn-hero-primary';
+      enterBtn.textContent = '전시장 입장하기';
+      enterBtn.addEventListener('click', () => onhadaEnterSupabaseArtworkList(exhibition.id));
+      actions.appendChild(enterBtn);
+
+      const backToListBtn = document.createElement('button');
+      backToListBtn.className = 'btn-hero-secondary';
+      backToListBtn.textContent = '전체 전시관 목록으로';
+      backToListBtn.addEventListener('click', () => closeHallView());
+      actions.appendChild(backToListBtn);
+
+      container.appendChild(actions);
+    }
+
     // 신규 내부 Supabase 전시관 카드 전용 입장 함수. 기존 enterSpecificHall(id)는
     // 건드리지 않고 완전히 분리된 경로로 둔다 - 로컬/Lovable 전시관은 계속
     // enterSpecificHall()만 사용한다.
     //
     // [설계 메모] visibility/operation_status를 이 함수에서 필드 값으로
     // 다시 검사하려면 onhadaPublicExhibitions 배열에 그 두 필드가 있어야
-    // 하는데, getPublicExhibitions()의 현재 select 목록에는 없다(이번
-    // 단계는 js/db-service.js 수정이 금지되어 있다). 대신 아래
-    // renderPublicSupabaseArtworks()가 호출하는
-    // getPublicArtworksForExhibition()이 서버측에서 항상
+    // 하는데, getPublicExhibitions()의 현재 select 목록에는 없다. 대신
+    // 작품 조회 시점(renderPublicSupabaseArtworks → getPublicArtworksForExhibition)에
     // exhibitions!inner(visibility='public' AND operation_status='operating')
-    // 조인 조건을 강제하므로, 그 조인이 실질적인 재확인 역할을 한다 - 사용자
-    // 승인 하에 이렇게 처리하기로 결정했다.
+    // 조인 조건이 서버측에서 항상 강제되므로, 그 조인이 실질적인 재확인
+    // 역할을 한다 - 사용자 승인 하에 이렇게 처리하기로 결정했다.
+    //
+    // 이 함수는 이제 입구 화면만 표시하고, 작품 조회(renderPublicSupabaseArtworks)는
+    // "전시장 입장하기" 클릭(onhadaEnterSupabaseArtworkList) 시점까지 미룬다.
     function enterSupabaseExhibition(exhibitionId) {
       const matched = onhadaPublicExhibitions.find(ex => ex.id === exhibitionId);
       if (!matched) return;
@@ -3986,22 +4236,60 @@
       activeHallId = null;
       activeSupabaseExhibitionId = exhibitionId;
 
-      const titleEl = document.getElementById('hall-active-title');
-      const galleryGrid = document.getElementById('hall-gallery-container');
       const subTabs = document.querySelector('.sub-tabs-bar');
       const searchBox = document.querySelector('.search-box-wrapper');
       const cardsGrid = document.getElementById('browse-halls-grid-container');
+      const entranceEl = document.getElementById('hall-entrance-container');
+      const listWrapperEl = document.getElementById('hall-artworks-list-wrapper');
+      const backBtnEl = document.getElementById('hall-back-to-entrance-btn');
 
       cardsGrid.style.display = 'none';
       subTabs.style.display = 'none';
       searchBox.style.display = 'none';
       document.getElementById('hall-artworks-section').style.display = 'block';
 
+      if (listWrapperEl) listWrapperEl.style.display = 'none';
+      if (backBtnEl) backBtnEl.style.display = 'none';
+      if (entranceEl) entranceEl.style.display = 'block';
+
+      onhadaRenderHallEntrance(matched);
+    }
+
+    // 입구의 "전시장 입장하기" 클릭 시에만 호출된다. 이 시점 이전에는
+    // getPublicArtworksForExhibition()이 전혀 호출되지 않는다.
+    function onhadaEnterSupabaseArtworkList(exhibitionId) {
+      const matched = onhadaPublicExhibitions.find(ex => ex.id === exhibitionId);
+
+      const entranceEl = document.getElementById('hall-entrance-container');
+      const listWrapperEl = document.getElementById('hall-artworks-list-wrapper');
+      const backBtnEl = document.getElementById('hall-back-to-entrance-btn');
+      const titleEl = document.getElementById('hall-active-title');
+
+      if (entranceEl) entranceEl.style.display = 'none';
+      if (listWrapperEl) listWrapperEl.style.display = 'block';
+      if (backBtnEl) backBtnEl.style.display = 'inline-block';
+
       if (titleEl) {
-        titleEl.textContent = '🚪 ' + (matched.title || '전시관') + (matched.organization_name ? (' (' + matched.organization_name + ')') : '');
+        titleEl.textContent = '🚪 ' + (matched && matched.title ? matched.title : '전시관') + (matched && matched.organization_name ? (' (' + matched.organization_name + ')') : '');
       }
 
       renderPublicSupabaseArtworks(exhibitionId);
+    }
+
+    // 작품 목록의 "입구로 돌아가기" 클릭 시 호출된다. activeSupabaseExhibitionId는
+    // 그대로 유지하고(같은 전시관 안에서의 이동), 작품 API는 재호출하지 않는다.
+    function onhadaBackToHallEntrance() {
+      const entranceEl = document.getElementById('hall-entrance-container');
+      const listWrapperEl = document.getElementById('hall-artworks-list-wrapper');
+      const backBtnEl = document.getElementById('hall-back-to-entrance-btn');
+
+      // 진행 중이던 작품/이미지 요청을 무효화하고, 받아둔 blob은 정리한다.
+      onhadaPublicArtworksRequestSeq += 1;
+      onhadaRevokePublicArtworkBlobUrls();
+
+      if (listWrapperEl) listWrapperEl.style.display = 'none';
+      if (backBtnEl) backBtnEl.style.display = 'none';
+      if (entranceEl) entranceEl.style.display = 'block';
     }
 
     // 공개 관람객 화면 전용 - 신규 Supabase 내부 전시관의 승인된 작품만
@@ -4154,17 +4442,16 @@
       document.getElementById('browse-halls-grid-container').style.display = 'grid';
       document.querySelector('.sub-tabs-bar').style.display = 'flex';
       document.querySelector('.search-box-wrapper').style.display = 'block';
-      
+
       // 전체 필터 리셋
       const allBtn = document.getElementById('btn-sub-browse-all');
       filterBrowseCategory('all', allBtn);
       document.getElementById('gallerySearchInput').value = "";
 
-      // 공개 Supabase 관람 상태 정리 - 관리자 미리보기 Map과는 분리된
-      // 이 화면 전용 Map만 정리한다.
-      onhadaPublicArtworksRequestSeq += 1;
-      activeSupabaseExhibitionId = null;
-      onhadaRevokePublicArtworkBlobUrls();
+      // 입구/작품 wrapper를 다음 진입을 위한 정상 상태로 복원하고, 공개
+      // Supabase 관람 상태(요청 시퀀스/활성 전시관 id/blob)를 정리한다.
+      // 관리자 미리보기 Map(onhadaCloudPreviewUrls)과는 완전히 분리되어 있다.
+      onhadaResetSupabaseHallUiState();
     }
 
     // [기관 전시관] 내부

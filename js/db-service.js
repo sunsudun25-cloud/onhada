@@ -238,10 +238,12 @@
                     slug,
                     legacy_id,
                     title,
+                    description,
                     tag,
                     organization_name,
                     cover_image_path,
                     exhibition_type,
+                    allow_comments,
                     is_demo,
                     exhibition_stats (
                         participant_count,
