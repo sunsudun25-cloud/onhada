@@ -3270,6 +3270,19 @@
     </div>
   </div>
 
+  <!-- 공용 작업 확인 모달 (native confirm() 대체) -->
+  <div class="admin-login-overlay" id="onhada-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="onhada-confirm-title">
+    <div class="admin-login-box">
+      <h3 id="onhada-confirm-title" style="font-size: 1.4rem; color: #fff; margin-bottom: 10px;">확인</h3>
+      <p id="onhada-confirm-message" style="font-size: 0.95rem; color: var(--text-gray); line-height: 1.6; margin-bottom: 25px; word-break: keep-all;"></p>
+
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-hero-secondary" id="onhada-confirm-cancel" onclick="onhadaConfirmActionCancel()" style="flex: 1;">취소</button>
+        <button class="btn-hero-primary" id="onhada-confirm-submit" onclick="onhadaConfirmActionSubmit()" style="flex: 1;">확인</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 알림 경고 팝업 -->
   <div class="alert-dialog-overlay" id="alert-dialog">
     <div class="alert-dialog-box">
@@ -3285,10 +3298,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260808-12"></script>
-  <script src="js/auth-service.js?v=20260808-12"></script>
-  <script src="js/db-service.js?v=20260808-12"></script>
-  <script src="js/storage-service.js?v=20260808-12"></script>
+  <script src="js/supabase-client.js?v=20260809-1"></script>
+  <script src="js/auth-service.js?v=20260809-1"></script>
+  <script src="js/db-service.js?v=20260809-1"></script>
+  <script src="js/storage-service.js?v=20260809-1"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4658,6 +4671,8 @@
     let onhadaCloudPendingArtworks = [];
     let onhadaCloudAdminRequestSeq = 0;
     let onhadaRejectReasonResolve = null;
+    let onhadaConfirmActionResolve = null;
+    let onhadaConfirmActionPreviousFocus = null;
     let onhadaManagerImageCategoriesPopulated = false;
     let onhadaCloudPreviewUrls = new Map();
     let onhadaCloudPreviewCompleted = new Set();
@@ -5768,8 +5783,12 @@
       if (submitBtn) submitBtn.disabled = true;
 
       try {
-        const confirmed = confirm('"' + finalTitle + '" 전시관을 비공개·준비 중 상태로 생성하시겠습니까?');
+        const confirmed = await onhadaConfirmAction(
+          '"' + finalTitle + '" 전시관을 비공개·준비 중 상태로 생성하시겠습니까?',
+          { title: '전시관 생성 확인', confirmLabel: '생성', cancelLabel: '취소' }
+        );
         if (!confirmed) {
+          if (statusEl) statusEl.textContent = "작업이 취소되었습니다.";
           return;
         }
 
@@ -5997,7 +6016,10 @@
       if (buttonEl) buttonEl.disabled = true;
 
       try {
-        const confirmed = confirm('"' + displayName + '" 계정을 "' + managerTypeLabel + '"(으)로 승인하시겠습니까?');
+        const confirmed = await onhadaConfirmAction(
+          '"' + displayName + '" 계정을 "' + managerTypeLabel + '"(으)로 승인하시겠습니까?',
+          { title: '운영자 승인 확인', confirmLabel: '승인', cancelLabel: '취소' }
+        );
         if (!confirmed) {
           return;
         }
@@ -6043,8 +6065,12 @@
       if (submitBtn) submitBtn.disabled = true;
 
       try {
-        const confirmed = confirm('"' + profile.display_name + '" 운영자를 "' + exhibition.title + '"에 배정하시겠습니까?');
+        const confirmed = await onhadaConfirmAction(
+          '"' + profile.display_name + '" 운영자를 "' + exhibition.title + '"에 배정하시겠습니까?',
+          { title: '운영자 배정 확인', confirmLabel: '배정', cancelLabel: '취소' }
+        );
         if (!confirmed) {
+          if (statusEl) statusEl.textContent = "작업이 취소되었습니다.";
           return;
         }
 
@@ -6174,7 +6200,10 @@
       if (buttonEl) buttonEl.disabled = true;
 
       try {
-        const confirmed = confirm('"' + displayName + '" 운영자의 전시관 배정을 해제하시겠습니까?');
+        const confirmed = await onhadaConfirmAction(
+          '"' + displayName + '" 운영자의 전시관 배정을 해제하시겠습니까?',
+          { title: '배정 해제 확인', confirmLabel: '해제', cancelLabel: '취소', danger: true }
+        );
         if (!confirmed) {
           return;
         }
@@ -6423,6 +6452,88 @@
       } finally {
         if (buttonEl) buttonEl.disabled = false;
       }
+    }
+
+    // 브라우저 네이티브 confirm()은 자동화/인앱 웹뷰 등 일부 환경에서
+    // 조용히 억제되고 항상 false를 반환할 수 있어(생성 버튼이 반응 없어
+    // 보이는 원인이었음), 앱 자체 모달로 확인을 받는다.
+    function onhadaConfirmActionKeydownHandler(evt) {
+      if (evt.key === 'Escape' || evt.key === 'Esc') {
+        evt.preventDefault();
+        onhadaConfirmActionCancel();
+      }
+    }
+
+    function onhadaConfirmAction(message, options) {
+      const opts = (options && typeof options === 'object') ? options : {};
+      const title = (typeof opts.title === 'string' && opts.title.trim()) ? opts.title : '확인';
+      const confirmLabel = (typeof opts.confirmLabel === 'string' && opts.confirmLabel.trim()) ? opts.confirmLabel : '확인';
+      const cancelLabel = (typeof opts.cancelLabel === 'string' && opts.cancelLabel.trim()) ? opts.cancelLabel : '취소';
+      const danger = opts.danger === true;
+      const safeMessage = (typeof message === 'string' && message.trim()) ? message : '이 작업을 진행하시겠습니까?';
+
+      return new Promise((resolve) => {
+        const overlay = document.getElementById('onhada-confirm-modal');
+        const titleEl = document.getElementById('onhada-confirm-title');
+        const messageEl = document.getElementById('onhada-confirm-message');
+        const cancelBtn = document.getElementById('onhada-confirm-cancel');
+        const submitBtn = document.getElementById('onhada-confirm-submit');
+
+        // 단일 요청만 관리 - 이미 열려 있는 요청이 있으면 취소로 정리한 뒤 새 요청을 연다.
+        if (onhadaConfirmActionResolve) {
+          const previousResolve = onhadaConfirmActionResolve;
+          onhadaConfirmActionResolve = null;
+          previousResolve(false);
+        }
+
+        if (titleEl) titleEl.textContent = title;
+        if (messageEl) messageEl.textContent = safeMessage;
+        if (cancelBtn) cancelBtn.textContent = cancelLabel;
+        if (submitBtn) {
+          submitBtn.textContent = confirmLabel;
+          submitBtn.classList.toggle('btn-hero-primary', !danger);
+          submitBtn.classList.toggle('btn-reject', danger);
+        }
+
+        onhadaConfirmActionResolve = resolve;
+        onhadaConfirmActionPreviousFocus = document.activeElement;
+
+        if (overlay) overlay.style.display = 'flex';
+        document.addEventListener('keydown', onhadaConfirmActionKeydownHandler);
+
+        const focusTarget = danger ? cancelBtn : submitBtn;
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+          focusTarget.focus();
+        } else if (submitBtn && typeof submitBtn.focus === 'function') {
+          submitBtn.focus();
+        }
+      });
+    }
+
+    function onhadaConfirmActionFinish(value) {
+      const resolve = onhadaConfirmActionResolve;
+      if (!resolve) return;
+      onhadaConfirmActionResolve = null;
+
+      const overlay = document.getElementById('onhada-confirm-modal');
+      const messageEl = document.getElementById('onhada-confirm-message');
+      if (overlay) overlay.style.display = 'none';
+      if (messageEl) messageEl.textContent = '';
+      document.removeEventListener('keydown', onhadaConfirmActionKeydownHandler);
+
+      const toFocus = onhadaConfirmActionPreviousFocus;
+      onhadaConfirmActionPreviousFocus = null;
+      if (toFocus && typeof toFocus.focus === 'function') toFocus.focus();
+
+      resolve(value);
+    }
+
+    function onhadaConfirmActionSubmit() {
+      onhadaConfirmActionFinish(true);
+    }
+
+    function onhadaConfirmActionCancel() {
+      onhadaConfirmActionFinish(false);
     }
 
     // 브라우저 네이티브 prompt()는 자동화/인앱 웹뷰 등 일부 환경에서
