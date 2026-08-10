@@ -2971,6 +2971,92 @@
           <button class="btn-hero-primary" id="onhada-manager-image-submit" onclick="onhadaSubmitManagedImageArtwork()" style="width:100%;" disabled>이미지 작품 등록</button>
           <p id="onhada-manager-image-status" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px;"></p>
         </div>
+
+        <!-- 통합 작품 등록 위저드(image/document 공용). 정상 초기화되면
+             위 두 구형 폼(onhada-manager-artwork-section/onhada-manager-image-section)을
+             JS에서 숨기고 이 영역만 보여준다. 초기화 실패 시에는 이 영역이
+             숨김 상태로 남고 위 구형 폼이 그대로 fallback으로 보인다. -->
+        <div id="onhada-manager-unified-section" style="display:none; margin-top: 30px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+            <h3 style="color:#fff; margin:0;">작품 등록</h3>
+            <span id="onhada-manager-unified-step-label" style="color:var(--text-gray); font-size:0.85rem;">1 / 5</span>
+          </div>
+          <div style="background: rgba(255,255,255,0.08); border-radius: 8px; height: 6px; margin-bottom: 20px; overflow:hidden;">
+            <div id="onhada-manager-unified-progress-bar" style="background: linear-gradient(90deg, #FFD700, #FFA500); height:100%; width:20%; transition: width 0.3s;"></div>
+          </div>
+
+          <h4 id="onhada-manager-unified-step-title" style="color:#fff; font-size:1.2rem; margin-bottom:6px;">1. 작품 종류 선택</h4>
+          <p id="onhada-manager-unified-step-desc" style="color:var(--text-gray); font-size:0.85rem; margin-bottom:16px;">등록할 작품의 종류를 선택하세요.</p>
+
+          <!-- 1단계: 작품 종류 -->
+          <div id="onhada-manager-unified-step-1" style="display:grid; gap:12px; margin-bottom:20px;">
+            <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-type-image-btn" onclick="onhadaManagerUnifiedSelectType('image')" style="display:block !important; height:auto !important; text-align:left; padding:16px;">
+              <strong style="display:block; margin-bottom:4px;">이미지 작품</strong>
+              <span style="font-size:0.8rem; color:var(--text-gray);">그림, 사진, 이미지형 디카시</span>
+            </button>
+            <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-type-document-btn" onclick="onhadaManagerUnifiedSelectType('document')" style="display:block !important; height:auto !important; text-align:left; padding:16px;">
+              <strong style="display:block; margin-bottom:4px;">문서 작품</strong>
+              <span style="font-size:0.8rem; color:var(--text-gray);">글, 시, 동화책, 문집</span>
+            </button>
+            <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-type-video-btn" disabled style="display:block !important; height:auto !important; text-align:left; padding:16px; opacity:0.5; cursor:not-allowed;">
+              <strong style="display:block; margin-bottom:4px;">영상 작품 (준비 중)</strong>
+              <span style="font-size:0.8rem; color:var(--text-gray);">영상 등록은 다음 단계에서 지원됩니다.</span>
+            </button>
+          </div>
+
+          <!-- 2단계: 파일 선택 -->
+          <div id="onhada-manager-unified-step-2" style="display:none; margin-bottom:20px;">
+            <div id="onhada-manager-unified-file-image-wrap" style="display:none;">
+              <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">이미지 파일</label>
+              <input type="file" id="onhada-manager-unified-file-image" class="form-control" accept="image/jpeg,image/png,image/webp" onchange="onhadaManagerUnifiedHandleFileChange(this)" style="margin-bottom:8px;">
+              <p style="color:var(--text-gray); font-size:0.8rem; margin-bottom:14px;">JPG, PNG, WEBP · 5MB 이하</p>
+            </div>
+            <div id="onhada-manager-unified-file-document-wrap" style="display:none;">
+              <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">문서 파일</label>
+              <input type="file" id="onhada-manager-unified-file-document" class="form-control" accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onhadaManagerUnifiedHandleFileChange(this)" style="margin-bottom:8px;">
+              <p style="color:var(--text-gray); font-size:0.8rem; margin-bottom:14px;">PDF는 20MB 이하, 이미지(JPG/PNG/WEBP)는 5MB 이하</p>
+            </div>
+            <div id="onhada-manager-unified-file-preview" style="margin-top:6px;"></div>
+          </div>
+
+          <!-- 3단계: 작품 정보 -->
+          <div id="onhada-manager-unified-step-3" style="display:none; margin-bottom:20px;">
+            <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작품명</label>
+            <input type="text" id="onhada-manager-unified-title" class="form-control" maxlength="100" style="margin-bottom:14px;">
+
+            <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작가명 또는 별명</label>
+            <input type="text" id="onhada-manager-unified-author" class="form-control" maxlength="50" style="margin-bottom:14px;">
+
+            <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">카테고리</label>
+            <select id="onhada-manager-unified-category" class="form-control" style="margin-bottom:14px;">
+              <option value="" style="background: #090916; color: #fff;">카테고리를 선택하세요</option>
+            </select>
+
+            <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">작품 소개</label>
+            <textarea id="onhada-manager-unified-description" class="form-control" maxlength="500" rows="3" style="margin-bottom:14px; resize:vertical;"></textarea>
+          </div>
+
+          <!-- 4단계: 전시 동의 -->
+          <div id="onhada-manager-unified-step-4" style="display:none; margin-bottom:20px;">
+            <label style="color:var(--text-gray); font-size:0.9rem; display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
+              <input type="checkbox" id="onhada-manager-unified-consent" style="margin-top:3px;">
+              <span>작가 또는 보호자에게 온라인 전시 및 작품 공개 동의를 확인했습니다.</span>
+            </label>
+          </div>
+
+          <!-- 5단계: 최종 미리보기 -->
+          <div id="onhada-manager-unified-step-5" style="display:none; margin-bottom:20px;">
+            <div id="onhada-manager-unified-summary-body"></div>
+          </div>
+
+          <p id="onhada-manager-unified-status" style="color:var(--text-gray); font-size:0.85rem; margin-bottom:14px;"></p>
+
+          <div id="onhada-manager-unified-nav-row" style="display:none; gap:10px;">
+            <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-prev-btn" onclick="onhadaManagerUnifiedPrevStep()" style="flex:1;">이전 단계</button>
+            <button type="button" class="btn-hero-primary" id="onhada-manager-unified-next-btn" onclick="onhadaManagerUnifiedNextStep()" style="flex:1;">다음 단계</button>
+          </div>
+          <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-restart-btn" onclick="onhadaManagerUnifiedRestart()" style="width:100%; margin-top:10px; font-size:0.8rem;">처음부터 다시</button>
+        </div>
       </div>
 
       <!-- ============================================== -->
@@ -3479,10 +3565,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260809-6"></script>
-  <script src="js/auth-service.js?v=20260809-6"></script>
-  <script src="js/db-service.js?v=20260809-6"></script>
-  <script src="js/storage-service.js?v=20260809-6"></script>
+  <script src="js/supabase-client.js?v=20260809-7"></script>
+  <script src="js/auth-service.js?v=20260809-7"></script>
+  <script src="js/db-service.js?v=20260809-7"></script>
+  <script src="js/storage-service.js?v=20260809-7"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -5022,6 +5108,15 @@
     let onhadaConfirmActionResolve = null;
     let onhadaConfirmActionPreviousFocus = null;
     let onhadaManagerImageCategoriesPopulated = false;
+    // 통합 작품 등록 위저드(image/document 공용) 전용 상태.
+    let onhadaManagerUnifiedActive = false;
+    let onhadaManagerUnifiedStep = 1;
+    let onhadaManagerUnifiedMediaType = null;
+    let onhadaManagerUnifiedFile = null;
+    let onhadaManagerUnifiedPreviewUrl = null;
+    let onhadaManagerUnifiedSubmitting = false;
+    let onhadaManagerUnifiedRequestToken = 0;
+    let onhadaManagerUnifiedCategoriesPopulated = false;
     let onhadaCloudPreviewUrls = new Map();
     let onhadaCloudPreviewCompleted = new Set();
     let onhadaPublicExhibitions = [];
@@ -5168,6 +5263,10 @@
         const passEl = document.getElementById('admin-passcode');
         if (passEl) passEl.value = "";
         onhadaResetManagedImageForm(null);
+        onhadaManagerUnifiedActive = false;
+        onhadaResetManagerUnifiedState();
+        const unifiedSectionEl = document.getElementById('onhada-manager-unified-section');
+        if (unifiedSectionEl) unifiedSectionEl.style.display = 'none';
         switchView('browse');
       }
       showAlertDialog("로그아웃 완료", "운영자 세션이 안전하게 종료되었습니다.", "🔒");
@@ -5265,6 +5364,7 @@
 
       onhadaResetManagedArtworkForm(found);
       onhadaResetManagedImageForm(found);
+      onhadaInitManagerUnifiedWizard(found);
       renderManagedArtworks(exhibitionId);
     }
 
@@ -5631,6 +5731,553 @@
       }
     }
 
+    // =====================================================================
+    // 통합 작품 등록 위저드 (image/document 공용, 5단계)
+    // 기존 텍스트/이미지 등록 폼(onhada-manager-artwork-section/
+    // onhada-manager-image-section)과 그 함수들은 전혀 건드리지 않는다.
+    // 이 위저드는 기존 Storage/DB 서비스 함수를 그대로 호출만 한다.
+    // =====================================================================
+
+    function onhadaFormatFileSize(bytes) {
+      if (!(bytes > 0)) return '0KB';
+      const mb = bytes / (1024 * 1024);
+      if (mb >= 1) return mb.toFixed(1) + 'MB';
+      const kb = bytes / 1024;
+      return Math.max(1, Math.round(kb)) + 'KB';
+    }
+
+    const ONHADA_MANAGER_UNIFIED_STEP_META = [
+      { title: '1. 작품 종류 선택', desc: '등록할 작품의 종류를 선택하세요.' },
+      { title: '2. 작품 파일 선택', desc: '' },
+      { title: '3. 작품 정보', desc: '작품에 대한 정보를 입력하세요.' },
+      { title: '4. 전시 동의', desc: '작가 또는 보호자의 전시 동의를 확인해 주세요.' },
+      { title: '5. 최종 미리보기', desc: '입력하신 내용을 확인한 뒤 등록해 주세요.' }
+    ];
+
+    // 담당 전시관 변경/로그아웃/등록 성공/"처음부터 다시"/모달 재오픈 시
+    // 공통으로 호출된다. 진행 중이던 제출을 무효화(request token 증가)하고
+    // 로컬 미리보기 object URL을 revoke한 뒤 모든 입력 DOM을 비운다.
+    function onhadaResetManagerUnifiedState() {
+      onhadaManagerUnifiedRequestToken += 1;
+
+      if (onhadaManagerUnifiedPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedPreviewUrl);
+        onhadaManagerUnifiedPreviewUrl = null;
+      }
+
+      onhadaManagerUnifiedStep = 1;
+      onhadaManagerUnifiedMediaType = null;
+      onhadaManagerUnifiedFile = null;
+      onhadaManagerUnifiedSubmitting = false;
+
+      const titleEl = document.getElementById('onhada-manager-unified-title');
+      const authorEl = document.getElementById('onhada-manager-unified-author');
+      const categoryEl = document.getElementById('onhada-manager-unified-category');
+      const descEl = document.getElementById('onhada-manager-unified-description');
+      const consentEl = document.getElementById('onhada-manager-unified-consent');
+      const fileImageEl = document.getElementById('onhada-manager-unified-file-image');
+      const fileDocEl = document.getElementById('onhada-manager-unified-file-document');
+      const previewEl = document.getElementById('onhada-manager-unified-file-preview');
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+      const summaryEl = document.getElementById('onhada-manager-unified-summary-body');
+
+      if (titleEl) titleEl.value = "";
+      if (authorEl) authorEl.value = "";
+      if (categoryEl) categoryEl.value = "";
+      if (descEl) descEl.value = "";
+      if (consentEl) consentEl.checked = false;
+      if (fileImageEl) fileImageEl.value = "";
+      if (fileDocEl) fileDocEl.value = "";
+      if (previewEl) previewEl.innerHTML = "";
+      if (statusEl) statusEl.textContent = "";
+      if (summaryEl) summaryEl.innerHTML = "";
+    }
+
+    // manager 인증 상태에서 정상 초기화된 경우에만 기존 두 폼을 숨긴다.
+    // 초기화 도중 어떤 이유로든 실패하면(예: 위저드 DOM이 없음) 기존 두 폼은
+    // onhadaResetManagedArtworkForm()/onhadaResetManagedImageForm()가 이미
+    // 표시해 둔 상태 그대로 유지되는 안전한 fallback이 된다.
+    function onhadaInitManagerUnifiedWizard(exhibition) {
+      try {
+        if (!isManagerAuthenticated) throw new Error('not_manager_authenticated');
+
+        const sectionEl = document.getElementById('onhada-manager-unified-section');
+        if (!sectionEl) throw new Error('unified_section_missing');
+
+        onhadaResetManagerUnifiedState();
+        onhadaManagerUnifiedActive = true;
+
+        const textSectionEl = document.getElementById('onhada-manager-artwork-section');
+        const imageSectionEl = document.getElementById('onhada-manager-image-section');
+        if (textSectionEl) textSectionEl.style.display = 'none';
+        if (imageSectionEl) imageSectionEl.style.display = 'none';
+
+        sectionEl.style.display = 'block';
+        onhadaRenderManagerUnifiedStep();
+        return true;
+      } catch (err) {
+        onhadaManagerUnifiedActive = false;
+        const sectionEl = document.getElementById('onhada-manager-unified-section');
+        if (sectionEl) sectionEl.style.display = 'none';
+        return false;
+      }
+    }
+
+    function onhadaRenderManagerUnifiedStep() {
+      const step = onhadaManagerUnifiedStep;
+      const meta = ONHADA_MANAGER_UNIFIED_STEP_META[step - 1];
+
+      const stepLabelEl = document.getElementById('onhada-manager-unified-step-label');
+      const progressBarEl = document.getElementById('onhada-manager-unified-progress-bar');
+      const stepTitleEl = document.getElementById('onhada-manager-unified-step-title');
+      const stepDescEl = document.getElementById('onhada-manager-unified-step-desc');
+      const prevBtn = document.getElementById('onhada-manager-unified-prev-btn');
+      const nextBtn = document.getElementById('onhada-manager-unified-next-btn');
+      const navRowEl = document.getElementById('onhada-manager-unified-nav-row');
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+
+      if (stepLabelEl) stepLabelEl.textContent = step + ' / 5';
+      if (progressBarEl) progressBarEl.style.width = (step * 20) + '%';
+      if (stepTitleEl) stepTitleEl.textContent = meta.title;
+      if (statusEl) statusEl.textContent = "";
+
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById('onhada-manager-unified-step-' + i);
+        if (el) el.style.display = (i === step) ? (i === 1 ? 'grid' : 'block') : 'none';
+      }
+
+      if (step === 2) {
+        if (stepDescEl) {
+          stepDescEl.textContent = onhadaManagerUnifiedMediaType === 'document'
+            ? 'PDF 또는 이미지(JPG/PNG/WEBP) 파일을 선택하세요.'
+            : '이미지(JPG/PNG/WEBP) 파일을 선택하세요.';
+        }
+        const imageWrap = document.getElementById('onhada-manager-unified-file-image-wrap');
+        const docWrap = document.getElementById('onhada-manager-unified-file-document-wrap');
+        if (imageWrap) imageWrap.style.display = onhadaManagerUnifiedMediaType === 'image' ? 'block' : 'none';
+        if (docWrap) docWrap.style.display = onhadaManagerUnifiedMediaType === 'document' ? 'block' : 'none';
+      } else if (stepDescEl) {
+        stepDescEl.textContent = meta.desc;
+      }
+
+      if (step === 3) {
+        onhadaPopulateManagerUnifiedCategories();
+      }
+
+      if (step === 5) {
+        onhadaRenderManagerUnifiedSummary();
+      }
+
+      if (navRowEl) navRowEl.style.display = step === 1 ? 'none' : 'flex';
+      if (prevBtn) prevBtn.disabled = onhadaManagerUnifiedSubmitting;
+      if (nextBtn) {
+        nextBtn.textContent = step === 5 ? '작품 등록하기' : '다음 단계';
+        nextBtn.disabled = onhadaManagerUnifiedSubmitting;
+      }
+    }
+
+    // 1단계 카드 클릭. video는 이 함수 자체가 호출되지 않도록 버튼에
+    // disabled만 걸어 두었다(onclick 미부여) - 여기서도 방어적으로
+    // image/document만 허용한다.
+    function onhadaManagerUnifiedSelectType(mediaType) {
+      if (onhadaManagerUnifiedSubmitting) return;
+      if (['image', 'document'].indexOf(mediaType) === -1) return;
+
+      onhadaManagerUnifiedMediaType = mediaType;
+      onhadaManagerUnifiedStep = 2;
+      onhadaRenderManagerUnifiedStep();
+    }
+
+    function onhadaManagerUnifiedHandleFileChange(inputEl) {
+      const file = inputEl && inputEl.files ? inputEl.files[0] : null;
+      const previewEl = document.getElementById('onhada-manager-unified-file-preview');
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+
+      if (onhadaManagerUnifiedPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedPreviewUrl);
+        onhadaManagerUnifiedPreviewUrl = null;
+      }
+      if (previewEl) previewEl.innerHTML = "";
+      if (statusEl) statusEl.textContent = "";
+
+      if (!(file instanceof File)) {
+        onhadaManagerUnifiedFile = null;
+        return;
+      }
+
+      onhadaManagerUnifiedFile = file;
+
+      const isImageMime = ['image/jpeg', 'image/png', 'image/webp'].indexOf(file.type) !== -1;
+
+      if (isImageMime) {
+        const url = URL.createObjectURL(file);
+        onhadaManagerUnifiedPreviewUrl = url;
+        if (previewEl) {
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = '선택한 이미지 미리보기';
+          img.style.cssText = "max-width:100%; border-radius:10px; display:block;";
+          previewEl.appendChild(img);
+        }
+      } else if (onhadaManagerUnifiedMediaType === 'document' && file.type === 'application/pdf') {
+        if (previewEl) {
+          // PDF는 파일명을 표시하지 않는다 - 고정 문구와 용량만 보여준다.
+          const p = document.createElement('p');
+          p.style.cssText = "color:#ddd; font-size:0.9rem;";
+          p.textContent = 'PDF 문서가 선택되었습니다.';
+          previewEl.appendChild(p);
+          const sizeP = document.createElement('p');
+          sizeP.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-top:4px;";
+          sizeP.textContent = onhadaFormatFileSize(file.size);
+          previewEl.appendChild(sizeP);
+        }
+      }
+    }
+
+    function onhadaManagerUnifiedValidateStep2() {
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+      const file = onhadaManagerUnifiedFile;
+
+      if (!(file instanceof File) && !(file instanceof Blob)) {
+        if (statusEl) statusEl.textContent = '파일을 선택해 주세요.';
+        return false;
+      }
+
+      if (!(file.size > 0)) {
+        if (statusEl) statusEl.textContent = '선택한 파일이 비어 있습니다. 다른 파일을 선택해 주세요.';
+        return false;
+      }
+
+      const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+
+      if (onhadaManagerUnifiedMediaType === 'image') {
+        if (IMAGE_MIME.indexOf(file.type) === -1) {
+          if (statusEl) statusEl.textContent = 'JPG, PNG, WEBP 형식만 등록할 수 있습니다.';
+          return false;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          if (statusEl) statusEl.textContent = '이미지 용량은 5MB를 초과할 수 없습니다.';
+          return false;
+        }
+        return true;
+      }
+
+      if (onhadaManagerUnifiedMediaType === 'document') {
+        if (file.type === 'application/pdf') {
+          if (file.size > 20 * 1024 * 1024) {
+            if (statusEl) statusEl.textContent = 'PDF 용량은 20MB를 초과할 수 없습니다.';
+            return false;
+          }
+          return true;
+        }
+        if (IMAGE_MIME.indexOf(file.type) !== -1) {
+          if (file.size > 5 * 1024 * 1024) {
+            if (statusEl) statusEl.textContent = '이미지 문서 용량은 5MB를 초과할 수 없습니다.';
+            return false;
+          }
+          return true;
+        }
+        if (statusEl) statusEl.textContent = 'PDF 또는 JPG, PNG, WEBP 형식만 등록할 수 있습니다.';
+        return false;
+      }
+
+      return false;
+    }
+
+    function onhadaManagerUnifiedValidateStep3() {
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+      const titleEl = document.getElementById('onhada-manager-unified-title');
+      const authorEl = document.getElementById('onhada-manager-unified-author');
+      const categoryEl = document.getElementById('onhada-manager-unified-category');
+      const descEl = document.getElementById('onhada-manager-unified-description');
+
+      const title = titleEl ? titleEl.value.trim() : '';
+      const author = authorEl ? authorEl.value.trim() : '';
+      const categoryId = categoryEl ? categoryEl.value : '';
+      const description = descEl ? descEl.value.trim() : '';
+
+      if (!title || title.length > 100) {
+        if (statusEl) statusEl.textContent = '작품명을 100자 이내로 입력해 주세요.';
+        return false;
+      }
+      if (!author || author.length > 50) {
+        if (statusEl) statusEl.textContent = '작가명 또는 별명을 50자 이내로 입력해 주세요.';
+        return false;
+      }
+      if (!categoryId) {
+        if (statusEl) statusEl.textContent = '카테고리를 선택해 주세요.';
+        return false;
+      }
+      if (description.length > 500) {
+        if (statusEl) statusEl.textContent = '작품 소개는 500자를 초과할 수 없습니다.';
+        return false;
+      }
+      return true;
+    }
+
+    function onhadaManagerUnifiedValidateStep4() {
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+      const consentEl = document.getElementById('onhada-manager-unified-consent');
+      if (!consentEl || !consentEl.checked) {
+        if (statusEl) statusEl.textContent = '전시 동의 확인이 필요합니다.';
+        return false;
+      }
+      return true;
+    }
+
+    function onhadaManagerUnifiedNextStep() {
+      if (onhadaManagerUnifiedSubmitting) return;
+
+      const step = onhadaManagerUnifiedStep;
+
+      if (step === 2 && !onhadaManagerUnifiedValidateStep2()) return;
+      if (step === 3 && !onhadaManagerUnifiedValidateStep3()) return;
+      if (step === 4 && !onhadaManagerUnifiedValidateStep4()) return;
+
+      if (step === 5) {
+        onhadaManagerUnifiedSubmit();
+        return;
+      }
+
+      onhadaManagerUnifiedStep = step + 1;
+      onhadaRenderManagerUnifiedStep();
+    }
+
+    function onhadaManagerUnifiedPrevStep() {
+      if (onhadaManagerUnifiedSubmitting) return;
+      if (onhadaManagerUnifiedStep <= 1) return;
+      onhadaManagerUnifiedStep -= 1;
+      onhadaRenderManagerUnifiedStep();
+    }
+
+    function onhadaManagerUnifiedRestart() {
+      if (onhadaManagerUnifiedSubmitting) return;
+      onhadaResetManagerUnifiedState();
+      onhadaRenderManagerUnifiedStep();
+    }
+
+    // 텍스트/이미지 등록 폼과 동일한 카테고리 캐시(currentManagerCategories)를
+    // 재사용한다 - 별도 카테고리 API를 다시 호출하지 않는다.
+    async function onhadaPopulateManagerUnifiedCategories() {
+      const categories = await onhadaLoadManagerCategories();
+      const categorySelect = document.getElementById('onhada-manager-unified-category');
+
+      if (!onhadaManagerUnifiedCategoriesPopulated && categorySelect && Array.isArray(categories) && categories.length > 0) {
+        categories.forEach(function (cat) {
+          const opt = document.createElement('option');
+          opt.value = cat.id;
+          opt.textContent = cat.name;
+          opt.style.background = '#090916';
+          opt.style.color = '#fff';
+          categorySelect.appendChild(opt);
+        });
+        onhadaManagerUnifiedCategoriesPopulated = true;
+      }
+    }
+
+    function onhadaRenderManagerUnifiedSummary() {
+      const bodyEl = document.getElementById('onhada-manager-unified-summary-body');
+      if (!bodyEl) return;
+      bodyEl.innerHTML = "";
+
+      const titleEl = document.getElementById('onhada-manager-unified-title');
+      const authorEl = document.getElementById('onhada-manager-unified-author');
+      const categorySelect = document.getElementById('onhada-manager-unified-category');
+      const descEl = document.getElementById('onhada-manager-unified-description');
+      const consentEl = document.getElementById('onhada-manager-unified-consent');
+
+      const title = titleEl ? titleEl.value.trim() : '';
+      const author = authorEl ? authorEl.value.trim() : '';
+      const categoryName = (categorySelect && categorySelect.selectedIndex >= 0 && categorySelect.options[categorySelect.selectedIndex])
+        ? categorySelect.options[categorySelect.selectedIndex].textContent
+        : '';
+      const description = descEl ? descEl.value.trim() : '';
+
+      const previewWrap = document.createElement('div');
+      previewWrap.style.cssText = "margin-bottom:16px;";
+      if (onhadaManagerUnifiedPreviewUrl) {
+        const img = document.createElement('img');
+        img.src = onhadaManagerUnifiedPreviewUrl;
+        img.alt = '작품 미리보기';
+        img.style.cssText = "max-width:100%; border-radius:10px; display:block;";
+        previewWrap.appendChild(img);
+      } else {
+        const icon = document.createElement('div');
+        icon.style.cssText = "background: rgba(255,255,255,0.06); border-radius:10px; padding:30px; text-align:center; color:var(--text-gray); font-size:0.9rem;";
+        icon.textContent = 'PDF 문서';
+        previewWrap.appendChild(icon);
+      }
+      bodyEl.appendChild(previewWrap);
+
+      function addRow(label, value) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = "margin-bottom:12px;";
+        const labelEl = document.createElement('p');
+        labelEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-bottom:2px;";
+        labelEl.textContent = label;
+        wrap.appendChild(labelEl);
+        const valueEl = document.createElement('p');
+        valueEl.style.cssText = "color:#fff; font-size:0.95rem; white-space:pre-wrap;";
+        valueEl.textContent = value && value.length > 0 ? value : '(입력 없음)';
+        wrap.appendChild(valueEl);
+        bodyEl.appendChild(wrap);
+      }
+
+      addRow('작품 종류', onhadaManagerUnifiedMediaType === 'image' ? '이미지 작품' : '문서 작품');
+      addRow('작품명', title);
+      addRow('작가명 또는 별명', author);
+      addRow('카테고리', categoryName);
+      addRow('작품 소개', description);
+      addRow('전시 동의', consentEl && consentEl.checked ? '동의 완료' : '미확인');
+    }
+
+    // 제출 오케스트레이션. 더블클릭 방지는 onhadaManagerUnifiedSubmitting
+    // 플래그를 upload 호출 전에 동기적으로 세워 보장한다. stale 판단 기준은
+    // 제출 시작 시점의 exhibitionId(processingExhibitionId)와
+    // currentManagedExhibitionId를 비교하는 방식이다.
+    async function onhadaManagerUnifiedSubmit() {
+      if (onhadaManagerUnifiedSubmitting) return;
+      if (!currentManagedExhibitionId) return;
+
+      if (!onhadaManagerUnifiedValidateStep2() || !onhadaManagerUnifiedValidateStep3() || !onhadaManagerUnifiedValidateStep4()) {
+        return;
+      }
+
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+      const prevBtn = document.getElementById('onhada-manager-unified-prev-btn');
+      const nextBtn = document.getElementById('onhada-manager-unified-next-btn');
+
+      const processingExhibitionId = currentManagedExhibitionId;
+      onhadaManagerUnifiedRequestToken += 1;
+      const requestToken = onhadaManagerUnifiedRequestToken;
+
+      onhadaManagerUnifiedSubmitting = true;
+      if (prevBtn) prevBtn.disabled = true;
+      if (nextBtn) nextBtn.disabled = true;
+      if (statusEl) statusEl.textContent = '작품을 등록하는 중입니다...';
+
+      const mediaType = onhadaManagerUnifiedMediaType;
+      const file = onhadaManagerUnifiedFile;
+      const title = document.getElementById('onhada-manager-unified-title').value.trim();
+      const author = document.getElementById('onhada-manager-unified-author').value.trim();
+      const categoryId = document.getElementById('onhada-manager-unified-category').value;
+      const description = document.getElementById('onhada-manager-unified-description').value.trim();
+
+      const isPdf = mediaType === 'document' && file.type === 'application/pdf';
+
+      async function removeUploaded(path) {
+        try {
+          if (isPdf) {
+            return await window.ONHADA_BACKEND.storage.removeManagedArtworkDocument(path);
+          }
+          return await window.ONHADA_BACKEND.storage.removeManagedArtworkAsset(path);
+        } catch (err) {
+          return { ok: false, error: null };
+        }
+      }
+
+      try {
+        let uploadResult;
+        try {
+          if (isPdf) {
+            uploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkDocument(processingExhibitionId, file);
+          } else {
+            uploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkImage(processingExhibitionId, file);
+          }
+        } catch (err) {
+          uploadResult = { ok: false, path: null, error: { code: 'unexpected_error', message: '파일 업로드 중 오류가 발생했습니다.' } };
+        }
+
+        if (!uploadResult.ok) {
+          // 업로드 자체가 실패했으면 남은 파일이 없으므로 stale이어도
+          // 보상 삭제는 필요 없다 - stale일 때는 화면 상태만 건드리지 않는다.
+          if (requestToken !== onhadaManagerUnifiedRequestToken) return;
+          if (statusEl) statusEl.textContent = (uploadResult.error && uploadResult.error.message) || '파일 업로드에 실패했습니다.';
+          return;
+        }
+
+        const path = uploadResult.path;
+
+        // stale 확인(토큰 변경 또는 전시관 변경) - 업로드가 성공한 뒤 stale이
+        // 되었다면 방금 올린 파일을 반드시 보상 삭제하고 화면 상태는 건드리지 않는다.
+        if (requestToken !== onhadaManagerUnifiedRequestToken || currentManagedExhibitionId !== processingExhibitionId) {
+          await removeUploaded(path);
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = '작품 정보를 승인 대기 상태로 저장하는 중입니다.';
+
+        const dbInput = {
+          media_type: mediaType,
+          title: title,
+          artist_display_name: author,
+          category_id: categoryId,
+          description: description,
+          consent_confirmed: true,
+          media_path: path
+        };
+
+        let dbResult;
+        try {
+          dbResult = await window.ONHADA_BACKEND.db.createManagedUnifiedArtwork(processingExhibitionId, dbInput);
+        } catch (err) {
+          dbResult = { ok: false, artwork: null, error: { code: 'unexpected_error', message: '작품 저장 중 오류가 발생했습니다.' } };
+        }
+
+        if (requestToken !== onhadaManagerUnifiedRequestToken) {
+          await removeUploaded(path);
+          return;
+        }
+
+        if (dbResult.ok) {
+          if (currentManagedExhibitionId === processingExhibitionId) {
+            onhadaResetManagerUnifiedState();
+            onhadaRenderManagerUnifiedStep();
+            const freshStatusEl = document.getElementById('onhada-manager-unified-status');
+            if (freshStatusEl) freshStatusEl.textContent = '작품이 승인 대기 상태로 등록되었습니다.';
+            renderManagedArtworks(processingExhibitionId);
+          }
+          return;
+        }
+
+        // DB 저장 실패 - 방금 올린 파일은 항상 보상 삭제한다.
+        const removeResult = await removeUploaded(path);
+
+        if (currentManagedExhibitionId === processingExhibitionId) {
+          if (removeResult.ok) {
+            // 파일만 정리하고 나머지 입력(제목/작가/카테고리/설명/동의)은
+            // 유지한다 - 사용자가 2단계로 돌아가 파일만 다시 선택하면 된다.
+            if (onhadaManagerUnifiedPreviewUrl) {
+              URL.revokeObjectURL(onhadaManagerUnifiedPreviewUrl);
+              onhadaManagerUnifiedPreviewUrl = null;
+            }
+            onhadaManagerUnifiedFile = null;
+            const fileImageEl = document.getElementById('onhada-manager-unified-file-image');
+            const fileDocEl = document.getElementById('onhada-manager-unified-file-document');
+            const previewEl = document.getElementById('onhada-manager-unified-file-preview');
+            if (fileImageEl) fileImageEl.value = "";
+            if (fileDocEl) fileDocEl.value = "";
+            if (previewEl) previewEl.innerHTML = "";
+            onhadaManagerUnifiedStep = 2;
+            onhadaRenderManagerUnifiedStep();
+            const freshStatusEl = document.getElementById('onhada-manager-unified-status');
+            if (freshStatusEl) {
+              const baseMsg = (dbResult.error && dbResult.error.message) || '작품 저장에 실패했습니다.';
+              freshStatusEl.textContent = baseMsg + ' 입력하신 내용은 유지되었습니다. 파일을 다시 선택해 등록해 주세요.';
+            }
+          } else {
+            if (statusEl) statusEl.textContent = '작품 저장과 임시 파일 정리에 실패했습니다. 다시 제출하지 말고 관리자에게 문의해 주세요.';
+          }
+        }
+      } finally {
+        onhadaManagerUnifiedSubmitting = false;
+        const finalPrevBtn = document.getElementById('onhada-manager-unified-prev-btn');
+        const finalNextBtn = document.getElementById('onhada-manager-unified-next-btn');
+        if (finalPrevBtn) finalPrevBtn.disabled = false;
+        if (finalNextBtn) finalNextBtn.disabled = false;
+      }
+    }
+
     // renderAllViews()에는 포함하지 않는다 - 전시관 "선택" 버튼을 눌렀을
     // 때만 명시적으로 호출한다.
     async function renderManagedArtworks(exhibitionId) {
@@ -5909,6 +6556,10 @@
       onhadaRevokeCloudPreviewUrls();
       onhadaRevokeAdminEntrancePreviewBlobUrls();
       onhadaRevokeAdminManagerPreviewBlobUrls();
+      if (onhadaManagerUnifiedPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedPreviewUrl);
+        onhadaManagerUnifiedPreviewUrl = null;
+      }
     });
 
     // 확정된 전시관 명명 규칙 - exhibition_type별 고정 접두어.
@@ -6407,20 +7058,32 @@
       });
     }
 
-    // 실제 #onhada-manager-artwork-section(텍스트 작품 등록)과 동일한
-    // 라벨·입력 순서·필수 항목을 그대로 보여주되, 완전히 다른 id를 쓰고
-    // 모든 입력/버튼을 disabled 처리한다. 카테고리는 이미 다른 화면에서
-    // 캐시된 currentManagerCategories가 있으면 그 실제 값을 그대로
-    // 재사용하고(추가 API 호출 없음), 없으면 안내 문구만 표시한다 - 이
-    // 미리보기를 위해 별도로 카테고리를 새로 조회하지 않는다.
-    function onhadaRenderAdminManagerPreviewTextForm(container) {
+    // 실제 통합 작품 등록 위저드(onhada-manager-unified-section)의 5단계
+    // 구성을 한 화면에서 요약해 보여준다(1단계 종류 카드/2단계 파일/3단계
+    // 공통 정보/4단계 동의/5단계 최종 제출). 완전히 다른 id를 쓰고 모든
+    // 입력/선택/버튼/파일을 disabled 처리한다. 카테고리는 이미 다른 화면에서
+    // 캐시된 currentManagerCategories가 있으면 그대로 재사용하고(추가 API
+    // 호출 없음), 없으면 안내 옵션만 표시한다.
+    function onhadaRenderAdminManagerPreviewUnifiedWizard(container) {
       const box = document.createElement('div');
       box.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px; margin-bottom: 20px;";
 
       const heading = document.createElement('h3');
-      heading.style.cssText = "color:#fff; margin-bottom:16px;";
-      heading.textContent = '텍스트 작품 등록';
+      heading.style.cssText = "color:#fff; margin-bottom:6px;";
+      heading.textContent = '작품 등록 (통합 위저드)';
       box.appendChild(heading);
+
+      const subheading = document.createElement('p');
+      subheading.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:20px;";
+      subheading.textContent = '실제 운영자가 사용하는 5단계 등록 흐름을 그대로 보여줍니다.';
+      box.appendChild(subheading);
+
+      function addStepHeading(stepNum, title) {
+        const h = document.createElement('h4');
+        h.style.cssText = "color:#fff; font-size:1rem; margin: 20px 0 10px;";
+        h.textContent = stepNum + '단계 · ' + title;
+        box.appendChild(h);
+      }
 
       function addLabel(text) {
         const label = document.createElement('label');
@@ -6429,140 +7092,59 @@
         box.appendChild(label);
       }
 
-      addLabel('작품명');
-      const titleInput = document.createElement('input');
-      titleInput.type = 'text';
-      titleInput.id = 'onhada-admin-manager-preview-text-title';
-      titleInput.className = 'form-control';
-      titleInput.maxLength = 100;
-      titleInput.disabled = true;
-      titleInput.style.marginBottom = '14px';
-      box.appendChild(titleInput);
+      // 1단계 - 작품 종류 카드(이미지/문서/영상 준비 중)
+      addStepHeading(1, '작품 종류 선택');
+      const typeCardWrap = document.createElement('div');
+      typeCardWrap.style.cssText = "display:grid; gap:10px; margin-bottom:10px;";
+      [
+        ['이미지 작품', '그림, 사진, 이미지형 디카시'],
+        ['문서 작품', '글, 시, 동화책, 문집'],
+        ['영상 작품 (준비 중)', '영상 등록은 다음 단계에서 지원됩니다.']
+      ].forEach(function (pair) {
+        const cardBtn = document.createElement('button');
+        cardBtn.type = 'button';
+        cardBtn.className = 'btn-hero-secondary';
+        cardBtn.disabled = true;
+        cardBtn.style.cssText = "display:block !important; height:auto !important; text-align:left; padding:14px; opacity:0.85;";
+        const strong = document.createElement('strong');
+        strong.style.cssText = "display:block; margin-bottom:2px;";
+        strong.textContent = pair[0];
+        const span = document.createElement('span');
+        span.style.cssText = "font-size:0.8rem; color:var(--text-gray);";
+        span.textContent = pair[1];
+        cardBtn.appendChild(strong);
+        cardBtn.appendChild(span);
+        typeCardWrap.appendChild(cardBtn);
+      });
+      box.appendChild(typeCardWrap);
 
-      addLabel('작가 표시명');
-      const authorInput = document.createElement('input');
-      authorInput.type = 'text';
-      authorInput.id = 'onhada-admin-manager-preview-text-author';
-      authorInput.className = 'form-control';
-      authorInput.maxLength = 50;
-      authorInput.disabled = true;
-      authorInput.style.marginBottom = '14px';
-      box.appendChild(authorInput);
-
-      addLabel('카테고리');
-      const categorySelect = document.createElement('select');
-      categorySelect.id = 'onhada-admin-manager-preview-text-category';
-      categorySelect.className = 'form-control';
-      categorySelect.disabled = true;
-      categorySelect.style.marginBottom = '14px';
-      const placeholderOpt = document.createElement('option');
-      placeholderOpt.value = '';
-      placeholderOpt.textContent = '카테고리를 선택하세요';
-      placeholderOpt.style.background = '#090916';
-      placeholderOpt.style.color = '#fff';
-      categorySelect.appendChild(placeholderOpt);
-      if (Array.isArray(currentManagerCategories)) {
-        currentManagerCategories.forEach(cat => {
-          const opt = document.createElement('option');
-          opt.value = cat.id;
-          opt.textContent = cat.name;
-          opt.style.background = '#090916';
-          opt.style.color = '#fff';
-          categorySelect.appendChild(opt);
-        });
-      }
-      box.appendChild(categorySelect);
-
-      addLabel('작품 설명');
-      const descTextarea = document.createElement('textarea');
-      descTextarea.id = 'onhada-admin-manager-preview-text-description';
-      descTextarea.className = 'form-control';
-      descTextarea.maxLength = 500;
-      descTextarea.rows = 3;
-      descTextarea.disabled = true;
-      descTextarea.style.cssText = "margin-bottom:14px; resize:vertical;";
-      box.appendChild(descTextarea);
-
-      addLabel('글/시 내용');
-      const poemTextarea = document.createElement('textarea');
-      poemTextarea.id = 'onhada-admin-manager-preview-text-poem';
-      poemTextarea.className = 'form-control';
-      poemTextarea.maxLength = 2000;
-      poemTextarea.rows = 4;
-      poemTextarea.disabled = true;
-      poemTextarea.style.cssText = "margin-bottom:14px; resize:vertical;";
-      box.appendChild(poemTextarea);
-
-      const consentLabel = document.createElement('label');
-      consentLabel.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px;";
-      const consentInput = document.createElement('input');
-      consentInput.type = 'checkbox';
-      consentInput.id = 'onhada-admin-manager-preview-text-consent';
-      consentInput.disabled = true;
-      consentInput.style.marginTop = '3px';
-      const consentSpan = document.createElement('span');
-      consentSpan.textContent = '작가 또는 보호자에게 온라인 전시 및 작품 공개 동의를 확인했습니다.';
-      consentLabel.appendChild(consentInput);
-      consentLabel.appendChild(consentSpan);
-      box.appendChild(consentLabel);
-
-      const submitBtn = document.createElement('button');
-      submitBtn.className = 'btn-hero-primary';
-      submitBtn.id = 'onhada-admin-manager-preview-text-submit';
-      submitBtn.style.width = '100%';
-      submitBtn.disabled = true;
-      submitBtn.textContent = '작품 등록';
-      box.appendChild(submitBtn);
-
-      const noticeEl = document.createElement('p');
-      noticeEl.style.cssText = "color:var(--text-gray); font-size:0.8rem; margin-top:10px;";
-      noticeEl.textContent = '관리자 미리보기에서는 작품을 등록할 수 없습니다. 실제 운영자 계정으로 로그인하면 사용할 수 있습니다.';
-      box.appendChild(noticeEl);
-
-      container.appendChild(box);
-    }
-
-    // 실제 #onhada-manager-image-section(이미지 작품 등록)과 동일한 구성.
-    function onhadaRenderAdminManagerPreviewImageForm(container) {
-      const box = document.createElement('div');
-      box.style.cssText = "background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px; margin-bottom: 20px;";
-
-      const heading = document.createElement('h3');
-      heading.style.cssText = "color:#fff; margin-bottom:16px;";
-      heading.textContent = '이미지 작품 등록';
-      box.appendChild(heading);
-
-      function addLabel(text) {
-        const label = document.createElement('label');
-        label.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;";
-        label.textContent = text;
-        box.appendChild(label);
-      }
-
-      addLabel('이미지 파일');
+      // 2단계 - 파일 선택
+      addStepHeading(2, '작품 파일 선택');
+      addLabel('이미지(JPG/PNG/WEBP · 5MB 이하) 또는 문서(PDF 20MB 이하 · 이미지 문서 5MB 이하)');
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
-      fileInput.id = 'onhada-admin-manager-preview-image-file';
+      fileInput.id = 'onhada-admin-manager-preview-unified-file';
       fileInput.className = 'form-control';
-      fileInput.accept = 'image/jpeg,image/png,image/webp';
       fileInput.disabled = true;
       fileInput.style.marginBottom = '14px';
       box.appendChild(fileInput);
 
+      // 3단계 - 공통 정보
+      addStepHeading(3, '작품 정보');
       addLabel('작품명');
       const titleInput = document.createElement('input');
       titleInput.type = 'text';
-      titleInput.id = 'onhada-admin-manager-preview-image-title';
+      titleInput.id = 'onhada-admin-manager-preview-unified-title';
       titleInput.className = 'form-control';
       titleInput.maxLength = 100;
       titleInput.disabled = true;
       titleInput.style.marginBottom = '14px';
       box.appendChild(titleInput);
 
-      addLabel('작가 표시명');
+      addLabel('작가명 또는 별명');
       const authorInput = document.createElement('input');
       authorInput.type = 'text';
-      authorInput.id = 'onhada-admin-manager-preview-image-author';
+      authorInput.id = 'onhada-admin-manager-preview-unified-author';
       authorInput.className = 'form-control';
       authorInput.maxLength = 50;
       authorInput.disabled = true;
@@ -6571,7 +7153,7 @@
 
       addLabel('카테고리');
       const categorySelect = document.createElement('select');
-      categorySelect.id = 'onhada-admin-manager-preview-image-category';
+      categorySelect.id = 'onhada-admin-manager-preview-unified-category';
       categorySelect.className = 'form-control';
       categorySelect.disabled = true;
       categorySelect.style.marginBottom = '14px';
@@ -6593,9 +7175,9 @@
       }
       box.appendChild(categorySelect);
 
-      addLabel('작품 설명');
+      addLabel('작품 소개');
       const descTextarea = document.createElement('textarea');
-      descTextarea.id = 'onhada-admin-manager-preview-image-description';
+      descTextarea.id = 'onhada-admin-manager-preview-unified-description';
       descTextarea.className = 'form-control';
       descTextarea.maxLength = 500;
       descTextarea.rows = 3;
@@ -6603,11 +7185,13 @@
       descTextarea.style.cssText = "margin-bottom:14px; resize:vertical;";
       box.appendChild(descTextarea);
 
+      // 4단계 - 전시 동의
+      addStepHeading(4, '전시 동의');
       const consentLabel = document.createElement('label');
       consentLabel.style.cssText = "color:var(--text-gray); font-size:0.85rem; display:flex; align-items:flex-start; gap:8px; margin-bottom:16px;";
       const consentInput = document.createElement('input');
       consentInput.type = 'checkbox';
-      consentInput.id = 'onhada-admin-manager-preview-image-consent';
+      consentInput.id = 'onhada-admin-manager-preview-unified-consent';
       consentInput.disabled = true;
       consentInput.style.marginTop = '3px';
       const consentSpan = document.createElement('span');
@@ -6616,12 +7200,19 @@
       consentLabel.appendChild(consentSpan);
       box.appendChild(consentLabel);
 
+      // 5단계 - 최종 미리보기 및 제출
+      addStepHeading(5, '최종 미리보기 및 제출');
+      const summaryNote = document.createElement('p');
+      summaryNote.style.cssText = "color:var(--text-gray); font-size:0.85rem; margin-bottom:14px;";
+      summaryNote.textContent = '작품 종류·미리보기·작품명·작가명·카테고리·소개·동의 완료 여부를 최종 확인한 뒤 제출합니다.';
+      box.appendChild(summaryNote);
+
       const submitBtn = document.createElement('button');
       submitBtn.className = 'btn-hero-primary';
-      submitBtn.id = 'onhada-admin-manager-preview-image-submit';
+      submitBtn.id = 'onhada-admin-manager-preview-unified-submit';
       submitBtn.style.width = '100%';
       submitBtn.disabled = true;
-      submitBtn.textContent = '이미지 작품 등록';
+      submitBtn.textContent = '작품 등록하기';
       box.appendChild(submitBtn);
 
       const noticeEl = document.createElement('p');
@@ -6672,8 +7263,7 @@
       artworksBox.appendChild(artworksListEl);
       bodyEl.appendChild(artworksBox);
 
-      onhadaRenderAdminManagerPreviewTextForm(bodyEl);
-      onhadaRenderAdminManagerPreviewImageForm(bodyEl);
+      onhadaRenderAdminManagerPreviewUnifiedWizard(bodyEl);
 
       onhadaAdminManagerPreviewOpen = true;
       onhadaAdminManagerPreviewPreviousFocus = document.activeElement;
