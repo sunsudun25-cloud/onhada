@@ -1788,6 +1788,120 @@
         }
     }
 
+    // 관리자 전용 - 전시관을 정확히 두 상태 조합 사이에서만 전환한다.
+    //   공개하기: visibility='public',  operation_status='operating'  (직전 상태가 private+preparing일 때만)
+    //   비공개 전환: visibility='private', operation_status='preparing' (직전 상태가 public+operating일 때만)
+    // 신규 SQL/RPC를 만들지 않는다 - 기존 exhibitions_update_admin RLS
+    // (USING/WITH CHECK 모두 is_admin() 전용)와 GRANT INSERT/UPDATE/DELETE ON
+    // exhibitions TO authenticated를 그대로 재사용한다. exhibitions에는
+    // manager용 UPDATE 정책이 애초에 존재하지 않으므로(SELECT만 있음)
+    // manager 세션은 이 UPDATE 시도 자체가 RLS에서 차단된다 - 아래
+    // context.profile.role==='admin' 검사는 그 앞단의 UX 방어선일 뿐이다.
+    async function setExhibitionPublicationAsAdmin(exhibitionId, shouldPublish) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, exhibition: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        // 1~2. 로그인 상태
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, exhibition: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        // 3. 관리자 계정 확인
+        if (!context.profile || context.profile.role !== 'admin') {
+            return { ok: false, exhibition: null, error: safeError('role_not_allowed', '전시관 공개 상태 변경은 관리자 계정만 가능합니다.') };
+        }
+
+        // 4. exhibitionId UUID 형식
+        if (!isValidUuid(exhibitionId)) {
+            return { ok: false, exhibition: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        // 5. shouldPublish 타입이 정확히 boolean인지(문자열 "true" 등은 차단)
+        if (typeof shouldPublish !== 'boolean') {
+            return { ok: false, exhibition: null, error: safeError('invalid_publication_mode', '요청 값이 올바르지 않습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, exhibition: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            // 대상 전시관을 최소 필드로 재조회한다.
+            const { data: current, error: fetchError } = await client
+                .from('exhibitions')
+                .select('id, is_external, visibility, operation_status')
+                .eq('id', exhibitionId)
+                .maybeSingle();
+
+            if (fetchError) {
+                return { ok: false, exhibition: null, error: safeError('exhibition_publication_failed', '전시관 정보를 확인하지 못했습니다.') };
+            }
+
+            if (!current) {
+                return { ok: false, exhibition: null, error: safeError('exhibition_not_found', '전시관을 찾을 수 없습니다.') };
+            }
+
+            if (current.is_external === true) {
+                return { ok: false, exhibition: null, error: safeError('external_exhibition_not_publishable', '외부 연동 전시관은 공개 상태를 변경할 수 없습니다.') };
+            }
+
+            const previousVisibility = current.visibility;
+            const previousOperationStatus = current.operation_status;
+
+            // 정확한 두 상태 조합만 서로 전환한다. unlisted/beta/ended나
+            // 서로 불일치하는 조합(예: public+preparing)은 전부 차단한다.
+            if (shouldPublish) {
+                if (previousVisibility !== 'private' || previousOperationStatus !== 'preparing') {
+                    return { ok: false, exhibition: null, error: safeError('invalid_exhibition_state', '현재 상태에서는 공개로 전환할 수 없습니다.') };
+                }
+            } else {
+                if (previousVisibility !== 'public' || previousOperationStatus !== 'operating') {
+                    return { ok: false, exhibition: null, error: safeError('invalid_exhibition_state', '현재 상태에서는 비공개로 전환할 수 없습니다.') };
+                }
+            }
+
+            // input을 그대로 스프레드하지 않고 payload를 내부에서 직접 구성한다.
+            const payload = shouldPublish
+                ? { visibility: 'public', operation_status: 'operating' }
+                : { visibility: 'private', operation_status: 'preparing' };
+
+            // 경쟁 상태 방지를 위해 재조회한 기존 값을 WHERE 조건에 그대로
+            // 재적용한다 - 조회와 UPDATE 사이에 다른 요청이 먼저 상태를
+            // 바꿨다면 이 UPDATE는 0행을 갱신하고 끝난다(아래에서 안전 처리).
+            const { data: updatedRows, error: updateError } = await client
+                .from('exhibitions')
+                .update(payload)
+                .eq('id', exhibitionId)
+                .eq('is_external', false)
+                .eq('visibility', previousVisibility)
+                .eq('operation_status', previousOperationStatus)
+                .select('id, visibility, operation_status, updated_at');
+
+            if (updateError) {
+                return { ok: false, exhibition: null, error: safeError('exhibition_publication_failed', '전시관 공개 상태 변경에 실패했습니다.') };
+            }
+
+            const rows = Array.isArray(updatedRows) ? updatedRows : [];
+
+            if (rows.length !== 1) {
+                // 0행(다른 요청이 먼저 상태를 바꿈) 또는 예상 밖의 다중 행 모두
+                // 성공으로 취급하지 않고 안전하게 상태 변경 오류로 처리한다.
+                return { ok: false, exhibition: null, error: safeError('publication_state_changed', '전시관 상태가 변경되어 요청을 처리할 수 없습니다.') };
+            }
+
+            // exhibition.id에는 UUID가 담기지만 이 반환값은 내부 데이터 용도다.
+            // 이후 UI 단계에서도 이 값을 DOM이나 console에 그대로 출력하지 않는다.
+            return { ok: true, exhibition: rows[0], error: null };
+        } catch (err) {
+            return { ok: false, exhibition: null, error: safeError('unexpected_error', '전시관 공개 상태 변경 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.db = {
         getMyManagedExhibitions: getMyManagedExhibitions,
         getManagedArtworks: getManagedArtworks,
@@ -1810,6 +1924,7 @@
         unassignExhibitionManager: unassignExhibitionManager,
         updateOwnArtworkAsManager: updateOwnArtworkAsManager,
         approveOwnArtworkAsManager: approveOwnArtworkAsManager,
-        deleteOwnArtworkAsManager: deleteOwnArtworkAsManager
+        deleteOwnArtworkAsManager: deleteOwnArtworkAsManager,
+        setExhibitionPublicationAsAdmin: setExhibitionPublicationAsAdmin
     };
 })();
