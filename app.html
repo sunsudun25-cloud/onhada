@@ -3550,6 +3550,31 @@
     </div>
   </div>
 
+  <!-- 공개 관람객 전용 - Supabase 공개 작품 상세보기 모달. 기존 localStorage
+       전시관용 openDetailModal()과 완전히 분리된 새 모달이며, 좋아요/댓글
+       기능은 이번 단계에 포함하지 않는다. 이 마크업에는 정적 라벨만 두고,
+       작품별 DB 문자열은 전부 JS에서 createElement/textContent로만 채운다. -->
+  <div class="admin-login-overlay" id="onhada-public-artwork-detail-modal" role="dialog" aria-modal="true" aria-labelledby="onhada-public-artwork-detail-title">
+    <div class="admin-login-box" id="onhada-public-artwork-detail-dialog" style="max-width: 640px; width: 92%; text-align: left; max-height: 88vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 10px;">
+        <h3 id="onhada-public-artwork-detail-title" style="font-size: 1.25rem; color: #fff; word-break: keep-all;"></h3>
+        <button class="btn-hero-secondary" id="onhada-public-artwork-detail-close" onclick="onhadaClosePublicArtworkDetail()" style="padding: 4px 12px; font-size: 0.85rem; flex-shrink: 0;" aria-label="작품 상세보기 닫기">✕</button>
+      </div>
+      <p id="onhada-public-artwork-detail-position" style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 14px;"></p>
+
+      <div id="onhada-public-artwork-detail-media" style="margin-bottom: 16px;"></div>
+
+      <span id="onhada-public-artwork-detail-badge" style="display:inline-block; background: rgba(255,255,255,0.08); border-radius: 12px; padding: 3px 10px; font-size: 0.75rem; color: var(--text-gray); margin-bottom: 8px;"></span>
+      <div id="onhada-public-artwork-detail-author" style="color: var(--text-gray); font-size: 0.9rem; margin-bottom: 10px;"></div>
+      <p id="onhada-public-artwork-detail-desc" style="color: #ddd; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; margin-bottom: 20px;"></p>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px;">
+        <button class="btn-hero-secondary" id="onhada-public-artwork-detail-prev" onclick="onhadaShowPreviousPublicArtworkDetail()" style="flex: 1;">← 이전 작품</button>
+        <button class="btn-hero-secondary" id="onhada-public-artwork-detail-next" onclick="onhadaShowNextPublicArtworkDetail()" style="flex: 1;">다음 작품 →</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 알림 경고 팝업 -->
   <div class="alert-dialog-overlay" id="alert-dialog">
     <div class="alert-dialog-box">
@@ -3565,10 +3590,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260811-2"></script>
-  <script src="js/auth-service.js?v=20260811-2"></script>
-  <script src="js/db-service.js?v=20260811-2"></script>
-  <script src="js/storage-service.js?v=20260811-2"></script>
+  <script src="js/supabase-client.js?v=20260811-3"></script>
+  <script src="js/auth-service.js?v=20260811-3"></script>
+  <script src="js/db-service.js?v=20260811-3"></script>
+  <script src="js/storage-service.js?v=20260811-3"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4264,6 +4289,11 @@
       onhadaPublicArtworksRequestSeq += 1;
       activeSupabaseExhibitionId = null;
       onhadaRevokePublicArtworkBlobUrls();
+
+      // 상세보기 모달이 열려 있었다면 강제로 닫고, 참조하던 작품 배열도 무효화한다.
+      onhadaClosePublicArtworkDetail();
+      onhadaPublicArtworkDetailArtworks = [];
+      onhadaPublicArtworkDetailExhibitionId = null;
     }
 
     // 전시관 유형 → 한글 명칭/입구 테마 클래스 매핑. ONHADA_EXHIBITION_TYPE_PREFIX
@@ -4380,6 +4410,11 @@
       const matched = onhadaPublicExhibitions.find(ex => ex.id === exhibitionId);
       if (!matched) return;
 
+      // 다른 전시관으로 이동하는 경우를 대비해 상세보기 모달과 참조 배열을 정리한다.
+      onhadaClosePublicArtworkDetail();
+      onhadaPublicArtworkDetailArtworks = [];
+      onhadaPublicArtworkDetailExhibitionId = null;
+
       activeHallId = null;
       activeSupabaseExhibitionId = exhibitionId;
 
@@ -4434,6 +4469,11 @@
       onhadaPublicArtworksRequestSeq += 1;
       onhadaRevokePublicArtworkBlobUrls();
 
+      // 카드가 화면에서 사라지므로 상세보기 모달이 열려 있었다면 닫는다
+      // (작품 배열 자체는 같은 전시관을 다시 입장할 때 재조회되므로 여기서는
+      // 지우지 않는다).
+      onhadaClosePublicArtworkDetail();
+
       if (listWrapperEl) listWrapperEl.style.display = 'none';
       if (backBtnEl) backBtnEl.style.display = 'none';
       if (entranceEl) entranceEl.style.display = 'block';
@@ -4451,6 +4491,12 @@
 
       // 새 전시관을 그리기 직전에 이전 전시관에서 만든 blob URL을 정리한다.
       onhadaRevokePublicArtworkBlobUrls();
+
+      // 상세보기 모달이 참조하던 이전 전시관의 작품 배열도 함께 무효화한다.
+      // 모달이 열려 있었다면 강제로 닫아 stale 데이터를 보여주지 않는다.
+      onhadaClosePublicArtworkDetail();
+      onhadaPublicArtworkDetailArtworks = [];
+      onhadaPublicArtworkDetailExhibitionId = null;
 
       galleryGrid.innerHTML = "";
       const loadingMsg = document.createElement('div');
@@ -4479,9 +4525,20 @@
         return;
       }
 
-      result.artworks.forEach(art => {
+      // 상세보기 모달은 이 배열의 참조와 index만 사용하고, 별도로 재조회하지 않는다.
+      onhadaPublicArtworkDetailArtworks = result.artworks;
+      onhadaPublicArtworkDetailExhibitionId = exhibitionId;
+
+      result.artworks.forEach((art, index) => {
         const item = document.createElement('div');
         item.className = 'gallery-card-item';
+        item.style.cursor = 'pointer';
+        // 카드 전체 클릭도 상세보기를 열지만, 키보드 접근은 아래 명시적
+        // 버튼이 담당한다(div는 기본적으로 tab 이동 대상이 아니다). UUID 등은
+        // 클로저에 담지 않고 배열 index만 전달한다.
+        item.addEventListener('click', function () {
+          onhadaOpenPublicArtworkDetail(index);
+        });
 
         const imgWrapper = document.createElement('div');
         imgWrapper.className = 'img-wrapper';
@@ -4518,6 +4575,21 @@
           poemEl.textContent = art.poem;
           infoBox.appendChild(poemEl);
         }
+
+        // 명시적 키보드 접근 경로. 카드(div) 클릭 핸들러로 이벤트가 다시
+        // 올라가 중복 오픈 시도를 만들지 않도록 stopPropagation한다(설령
+        // 중복 호출되더라도 onhadaOpenPublicArtworkDetail 자체가 중복 열기를
+        // 막지만, 굳이 두 번 시도할 이유가 없다).
+        const detailBtn = document.createElement('button');
+        detailBtn.type = 'button';
+        detailBtn.className = 'btn-hero-secondary';
+        detailBtn.style.cssText = "margin-top:10px; font-size:0.8rem; padding:6px 14px;";
+        detailBtn.textContent = '작품 상세보기';
+        detailBtn.addEventListener('click', function (evt) {
+          evt.stopPropagation();
+          onhadaOpenPublicArtworkDetail(index);
+        });
+        infoBox.appendChild(detailBtn);
 
         item.appendChild(infoBox);
         galleryGrid.appendChild(item);
@@ -4582,6 +4654,378 @@
       errMsg.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.85rem; padding: 20px 0;";
       errMsg.textContent = "이미지를 불러올 수 없습니다.";
       containerEl.appendChild(errMsg);
+    }
+
+    // =========================================================================
+    // 공개 작품 상세보기 모달 - Supabase 공개 작품 전용. 기존 localStorage
+    // 전시관용 openDetailModal()/closeModal()과 완전히 분리돼 있으며 서로
+    // 호출하지 않는다. 좋아요/댓글은 이번 단계에서 다루지 않는다. 모든 DB
+    // 문자열은 createElement/textContent로만 채우고 innerHTML에 삽입하지
+    // 않는다. Blob URL은 onhadaPublicArtworkDetailBlobUrls(상세 전용)만
+    // 소유·revoke하며, 목록 소유 onhadaPublicArtworkBlobUrls는 절대 건드리지 않는다.
+    // =========================================================================
+
+    function onhadaRevokePublicArtworkDetailBlobUrls() {
+      onhadaPublicArtworkDetailBlobUrls.forEach(function (url) {
+        URL.revokeObjectURL(url);
+      });
+      onhadaPublicArtworkDetailBlobUrls.clear();
+    }
+
+    // PDF "새 창에서 보기" 전용 object URL 하나를 정리한다(멱등) - Map에
+    // 그 URL이 남아있을 때만 타이머를 취소하고 revoke한 뒤 Map에서 제거한다.
+    // 이미 정리된(=Map에 없는) URL로 다시 호출해도 아무 일도 하지 않으므로
+    // 팝업 차단 시의 즉시 정리와 30초 타이머의 지연 정리가 서로 겹쳐도
+    // 안전하다(중복 revoke 없음).
+    function onhadaRevokeSinglePublicArtworkDetailPdfWindowUrl(url) {
+      if (!onhadaPublicArtworkDetailPdfWindowResources.has(url)) return;
+      const timerId = onhadaPublicArtworkDetailPdfWindowResources.get(url);
+      onhadaPublicArtworkDetailPdfWindowResources.delete(url);
+      if (timerId !== null && timerId !== undefined) clearTimeout(timerId);
+      URL.revokeObjectURL(url);
+    }
+
+    // beforeunload 전용 - 그 시점까지 아직 30초가 지나지 않아 Map에 남아있는
+    // 모든 새 창 전용 URL·타이머를 한 번에 정리한다. onhadaClosePublicArtworkDetail()/
+    // onhadaRenderPublicArtworkDetail()은 이 함수를 호출하지 않는다 - 모달을
+    // 닫거나 이전/다음으로 이동해도 이미 성공적으로 열린 새 창의 URL은
+    // 그대로 살려 둬야 하기 때문이다(각자의 30초 타이머 또는 beforeunload가
+    // 정리를 책임진다).
+    function onhadaRevokeAllPublicArtworkDetailPdfWindowUrls() {
+      onhadaPublicArtworkDetailPdfWindowResources.forEach(function (timerId, url) {
+        if (timerId !== null && timerId !== undefined) clearTimeout(timerId);
+        URL.revokeObjectURL(url);
+      });
+      onhadaPublicArtworkDetailPdfWindowResources.clear();
+    }
+
+    window.addEventListener('beforeunload', function () {
+      onhadaRevokePublicArtworkDetailBlobUrls();
+      onhadaRevokeAllPublicArtworkDetailPdfWindowUrls();
+    });
+
+    // 현재 진행 중인 상세 미디어 다운로드가 여전히 유효한 요청인지 확인한다.
+    // 모달이 닫혔거나, 다른 index/전시관으로 이동했거나, 더 최신 요청이
+    // 시작됐으면 false를 반환해 호출자가 즉시 결과를 버리고(blob이 있다면
+    // revoke) 화면에 반영하지 않도록 한다.
+    function onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, artworkId) {
+      if (requestSeq !== onhadaPublicArtworkDetailRequestSeq) return false;
+      if (!onhadaPublicArtworkDetailOpen) return false;
+      if (!activeSupabaseExhibitionId || onhadaPublicArtworkDetailExhibitionId !== activeSupabaseExhibitionId) return false;
+      const current = onhadaPublicArtworkDetailArtworks[onhadaPublicArtworkDetailIndex];
+      if (!current || current.id !== artworkId) return false;
+      return true;
+    }
+
+    function onhadaShowPublicArtworkDetailMediaError(containerEl, message) {
+      if (!containerEl) return;
+      containerEl.innerHTML = "";
+      const errMsg = document.createElement('p');
+      errMsg.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.9rem; padding: 40px 0;";
+      errMsg.textContent = message || "콘텐츠를 불러올 수 없습니다.";
+      containerEl.appendChild(errMsg);
+    }
+
+    function onhadaRenderPublicArtworkDetailImageElement(containerEl, objectUrl, title) {
+      containerEl.innerHTML = "";
+      const img = document.createElement('img');
+      img.src = objectUrl;
+      img.alt = (title || '작품') + ' 이미지';
+      img.style.cssText = "max-width:100%; max-height:65vh; display:block; margin:0 auto; border-radius:12px;";
+      containerEl.appendChild(img);
+    }
+
+    // media_type='image'와 media_type='document'(비-PDF) 공용. 목록 카드가
+    // 이미 안전하게 받아둔 blob(onhadaPublicArtworkBlobUrls)이 있으면 그대로
+    // 재사용해 재다운로드하지 않는다 - 이 경우 상세 모달은 그 URL의
+    // 소유권을 갖지 않으므로 onhadaPublicArtworkDetailBlobUrls에 저장하지도,
+    // revoke하지도 않는다. 없을 때만 downloadArtworkAsset()으로 새로 받아
+    // 상세 전용 Map에 저장한다. public/signed URL은 만들지 않는다.
+    async function onhadaLoadPublicArtworkDetailImage(art, requestSeq, containerEl, errorMessage) {
+      const safeErrorMessage = errorMessage || "이미지를 불러올 수 없습니다.";
+
+      const listOwnedUrl = onhadaPublicArtworkBlobUrls.get(art.id);
+      if (listOwnedUrl) {
+        onhadaRenderPublicArtworkDetailImageElement(containerEl, listOwnedUrl, art.title);
+        return;
+      }
+
+      const path = art.media_url || art.thumbnail_url;
+      if (!path) {
+        onhadaShowPublicArtworkDetailMediaError(containerEl, safeErrorMessage);
+        return;
+      }
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) return;
+
+      if (!result.ok || !result.blob) {
+        onhadaShowPublicArtworkDetailMediaError(containerEl, safeErrorMessage);
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      onhadaPublicArtworkDetailBlobUrls.set(art.id, objectUrl);
+      onhadaRenderPublicArtworkDetailImageElement(containerEl, objectUrl, art.title);
+    }
+
+    // media_type='document'이면서 확장자가 .pdf인 경우 전용. 확장자 판별은
+    // 기존 onhadaManagerUnifiedCleanupPaths()가 쓰는 것과 동일한 /\.pdf$/i
+    // 규칙을 그대로 재사용한다(경로 문자열 자체는 화면에 노출하지 않는다).
+    // 새 창 버튼 클릭 시 호출된다(여러 번 눌러도 매번 독립적으로 동작).
+    // 상세 미리보기(iframe)용 objectUrl과는 완전히 별개인 새 object URL을
+    // 같은 Blob에서 매 클릭마다 새로 만들어 "새 창 작업"이 단독으로 소유한다.
+    // 이 URL은 onhadaClosePublicArtworkDetail()/onhadaRenderPublicArtworkDetail()이
+    // 절대 건드리지 않는다 - 모달을 닫거나 다른 작품으로 이동해도 이미
+    // 성공적으로 열린 새 창은 그대로 살아있어야 하기 때문이다. 팝업이
+    // 차단되면(window.open이 falsy를 반환하면) 그 URL은 애초에 Map에
+    // 넣지 않고 즉시 revoke하고 안내 문구만 표시한다. 성공하면
+    // onhadaPublicArtworkDetailPdfWindowResources(Map<url, timerId>)에
+    // 이 URL을 추가하고, 새 창이 blob을 이미 로드할 충분한 유예 시간(30초 -
+    // blob은 네트워크 요청 없이 메모리에서 즉시 열리므로 실제로는 훨씬
+    // 짧은 시간이면 충분하다) 뒤에 그 URL 하나만 revoke하는 타이머를 건다.
+    // 같은 PDF를 여러 번 열면 URL·타이머 쌍이 그만큼 늘어나고, 각 타이머는
+    // 자신의 URL만 정리한다(다른 URL에 영향 없음). 남은 항목은 beforeunload가
+    // 전부 정리한다.
+    function onhadaOpenPublicArtworkDetailPdfInNewWindow(pdfBlob, statusMsgEl) {
+      const windowUrl = URL.createObjectURL(pdfBlob);
+      const win = window.open(windowUrl, '_blank', 'noopener');
+
+      if (!win) {
+        URL.revokeObjectURL(windowUrl);
+        if (statusMsgEl) {
+          statusMsgEl.textContent = "새 창을 열 수 없습니다. 브라우저의 팝업 허용 설정을 확인해 주세요.";
+        }
+        return;
+      }
+
+      const timerId = setTimeout(function () {
+        onhadaRevokeSinglePublicArtworkDetailPdfWindowUrl(windowUrl);
+      }, 30000);
+
+      onhadaPublicArtworkDetailPdfWindowResources.set(windowUrl, timerId);
+    }
+
+    async function onhadaLoadPublicArtworkDetailPdf(art, requestSeq, containerEl) {
+      const path = art.media_url;
+      if (!path) {
+        onhadaShowPublicArtworkDetailMediaError(containerEl, "작품 파일을 불러올 수 없습니다.");
+        return;
+      }
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkDocument(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) return;
+
+      if (!result.ok || !result.blob) {
+        onhadaShowPublicArtworkDetailMediaError(containerEl, "작품 파일을 불러올 수 없습니다.");
+        return;
+      }
+
+      const pdfBlob = result.blob;
+      const objectUrl = URL.createObjectURL(pdfBlob);
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      onhadaPublicArtworkDetailBlobUrls.set(art.id, objectUrl);
+
+      containerEl.innerHTML = "";
+
+      const frame = document.createElement('iframe');
+      frame.src = objectUrl;
+      frame.title = 'PDF 미리보기';
+      frame.style.cssText = "width:100%; height:55vh; border:0; border-radius:12px; background:#fff;";
+      containerEl.appendChild(frame);
+
+      const statusMsg = document.createElement('p');
+      statusMsg.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.8rem; margin-top:10px;";
+      statusMsg.textContent = "미리보기가 표시되지 않으면 아래 버튼으로 새 창에서 열어 주세요.";
+      containerEl.appendChild(statusMsg);
+
+      // Storage 경로가 아니라 방금 받은 Blob 객체 자체를 클로저로 넘긴다.
+      // 새 창 전용 URL은 클릭 시점에 이 Blob에서 새로 생성된다(위 iframe의
+      // objectUrl과는 별개 URL).
+      const openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.className = 'btn-hero-secondary';
+      openBtn.textContent = 'PDF 새 창에서 보기';
+      openBtn.style.cssText = "display:block; margin: 10px auto 0;";
+      openBtn.addEventListener('click', function () {
+        onhadaOpenPublicArtworkDetailPdfInNewWindow(pdfBlob, statusMsg);
+      });
+      containerEl.appendChild(openBtn);
+    }
+
+    // media_type에 맞는 상세 본문을 분기한다. text는 Storage 다운로드를
+    // 전혀 호출하지 않는다. video/audio/mixed 및 그 외 값은 현재 공개
+    // 조회·Storage 지원 범위 밖이므로 임의 URL을 열지 않고 안내 문구만 표시한다.
+    function onhadaLoadPublicArtworkDetailMedia(art, requestSeq, containerEl) {
+      if (!containerEl) return;
+
+      if (art.media_type === 'image') {
+        onhadaLoadPublicArtworkDetailImage(art, requestSeq, containerEl);
+        return;
+      }
+
+      if (art.media_type === 'document') {
+        const path = art.media_url || '';
+        if (/\.pdf$/i.test(path)) {
+          onhadaLoadPublicArtworkDetailPdf(art, requestSeq, containerEl);
+        } else {
+          onhadaLoadPublicArtworkDetailImage(art, requestSeq, containerEl, "작품 파일을 불러올 수 없습니다.");
+        }
+        return;
+      }
+
+      if (art.media_type === 'text') {
+        const bodyEl = document.createElement('p');
+        bodyEl.style.cssText = "white-space:pre-wrap; color:#ddd; font-size:0.95rem; line-height:1.7; padding: 10px 0;";
+        bodyEl.textContent = art.poem || '본문이 없습니다.';
+        containerEl.appendChild(bodyEl);
+        return;
+      }
+
+      const noticeEl = document.createElement('p');
+      noticeEl.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.9rem; padding: 40px 0;";
+      noticeEl.textContent = "현재 상세 재생을 준비 중입니다.";
+      containerEl.appendChild(noticeEl);
+    }
+
+    // 현재 index의 작품 정보를 모달에 채운다. 열기/이전/다음 이동 시
+    // 공통으로 호출된다. 호출 시점에 항상 이전 상세 전용 blob을 먼저
+    // revoke한 뒤 새 콘텐츠를 요청한다(늦게 도착하는 이전 요청 결과는
+    // onhadaIsPublicArtworkDetailRequestCurrent가 걸러 즉시 revoke한다).
+    function onhadaRenderPublicArtworkDetail() {
+      const art = onhadaPublicArtworkDetailArtworks[onhadaPublicArtworkDetailIndex];
+      if (!art) {
+        onhadaClosePublicArtworkDetail();
+        return;
+      }
+
+      const titleEl = document.getElementById('onhada-public-artwork-detail-title');
+      const authorEl = document.getElementById('onhada-public-artwork-detail-author');
+      const badgeEl = document.getElementById('onhada-public-artwork-detail-badge');
+      const descEl = document.getElementById('onhada-public-artwork-detail-desc');
+      const positionEl = document.getElementById('onhada-public-artwork-detail-position');
+      const mediaEl = document.getElementById('onhada-public-artwork-detail-media');
+      const prevBtn = document.getElementById('onhada-public-artwork-detail-prev');
+      const nextBtn = document.getElementById('onhada-public-artwork-detail-next');
+
+      if (titleEl) titleEl.textContent = art.title || '(제목 없음)';
+      if (authorEl) authorEl.textContent = art.artist_display_name || '작가 미상';
+      if (badgeEl) badgeEl.textContent = (art.categories && art.categories.name) ? art.categories.name : '카테고리 미확인';
+      if (descEl) descEl.textContent = art.description || '작품 설명이 없습니다.';
+      if (positionEl) positionEl.textContent = (onhadaPublicArtworkDetailIndex + 1) + ' / ' + onhadaPublicArtworkDetailArtworks.length;
+
+      if (prevBtn) prevBtn.disabled = (onhadaPublicArtworkDetailIndex <= 0);
+      if (nextBtn) nextBtn.disabled = (onhadaPublicArtworkDetailIndex >= onhadaPublicArtworkDetailArtworks.length - 1);
+
+      onhadaPublicArtworkDetailRequestSeq += 1;
+      const requestSeq = onhadaPublicArtworkDetailRequestSeq;
+      // 상세 모달(iframe/이미지)이 소유한 blob만 정리한다. 이미 성공적으로
+      // 열린 "PDF 새 창" 전용 URL(onhadaPublicArtworkDetailPdfWindowResources)은
+      // 다른 작품으로 이동해도 절대 여기서 revoke하지 않는다 - 그 새 창은
+      // 계속 열려 있어야 하기 때문이다(각자의 30초 타이머 또는 beforeunload가 정리).
+      onhadaRevokePublicArtworkDetailBlobUrls();
+
+      if (mediaEl) {
+        mediaEl.innerHTML = "";
+        onhadaLoadPublicArtworkDetailMedia(art, requestSeq, mediaEl);
+      }
+    }
+
+    function onhadaPublicArtworkDetailKeydownHandler(evt) {
+      if (evt.key === 'Escape' || evt.key === 'Esc') {
+        evt.preventDefault();
+        onhadaClosePublicArtworkDetail();
+      }
+    }
+
+    // 카드/버튼이 전달한 배열 index만 받는다(UUID/경로는 절대 인자로 받지 않는다).
+    // 존재하지 않는 index, 현재 전시관과 불일치하는 상태는 즉시 차단한다.
+    function onhadaOpenPublicArtworkDetail(index) {
+      if (onhadaPublicArtworkDetailOpen) return;
+
+      if (!activeSupabaseExhibitionId || onhadaPublicArtworkDetailExhibitionId !== activeSupabaseExhibitionId) return;
+      if (!Array.isArray(onhadaPublicArtworkDetailArtworks)) return;
+
+      const art = onhadaPublicArtworkDetailArtworks[index];
+      if (!art) return;
+
+      const overlay = document.getElementById('onhada-public-artwork-detail-modal');
+      const closeBtn = document.getElementById('onhada-public-artwork-detail-close');
+      if (!overlay) return;
+
+      onhadaPublicArtworkDetailIndex = index;
+      onhadaPublicArtworkDetailOpen = true;
+      onhadaPublicArtworkDetailPreviousFocus = document.activeElement;
+
+      overlay.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onhadaPublicArtworkDetailKeydownHandler);
+
+      onhadaRenderPublicArtworkDetail();
+
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+    }
+
+    function onhadaClosePublicArtworkDetail() {
+      if (!onhadaPublicArtworkDetailOpen) return;
+      onhadaPublicArtworkDetailOpen = false;
+
+      // 진행 중이던 상세 다운로드를 무효화하고, 상세 모달(iframe/이미지) 소유
+      // blob만 정리한다. 이미 성공적으로 열린 "PDF 새 창" 전용 URL은 모달을
+      // 닫아도 revoke하지 않는다 - 그 새 창은 계속 열려 있어야 하며, 정리는
+      // 각자의 30초 타이머 또는 beforeunload가 담당한다.
+      onhadaPublicArtworkDetailRequestSeq += 1;
+      onhadaRevokePublicArtworkDetailBlobUrls();
+      onhadaPublicArtworkDetailIndex = -1;
+
+      const overlay = document.getElementById('onhada-public-artwork-detail-modal');
+      const mediaEl = document.getElementById('onhada-public-artwork-detail-media');
+      if (overlay) overlay.style.display = 'none';
+      if (mediaEl) mediaEl.innerHTML = "";
+
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onhadaPublicArtworkDetailKeydownHandler);
+
+      const toFocus = onhadaPublicArtworkDetailPreviousFocus;
+      onhadaPublicArtworkDetailPreviousFocus = null;
+      if (toFocus && typeof toFocus.focus === 'function') toFocus.focus();
+    }
+
+    function onhadaShowPreviousPublicArtworkDetail() {
+      if (!onhadaPublicArtworkDetailOpen) return;
+      if (onhadaPublicArtworkDetailIndex <= 0) return;
+      onhadaPublicArtworkDetailIndex -= 1;
+      onhadaRenderPublicArtworkDetail();
+    }
+
+    function onhadaShowNextPublicArtworkDetail() {
+      if (!onhadaPublicArtworkDetailOpen) return;
+      if (onhadaPublicArtworkDetailIndex >= onhadaPublicArtworkDetailArtworks.length - 1) return;
+      onhadaPublicArtworkDetailIndex += 1;
+      onhadaRenderPublicArtworkDetail();
     }
 
     function closeHallView() {
@@ -5144,6 +5588,26 @@
     let activeSupabaseExhibitionId = null;
     let onhadaPublicArtworksRequestSeq = 0;
     let onhadaPublicArtworkBlobUrls = new Map();
+
+    // 공개 작품 상세보기 모달 전용 상태. onhadaPublicArtworkBlobUrls(목록용)와는
+    // 완전히 분리된 별도 Map만 다루며, 상세 모달은 목록 소유 blob을 절대
+    // revoke하지 않는다. onhadaPublicArtworkDetailArtworks는 renderPublicSupabaseArtworks()가
+    // 실제로 그린 배열의 참조만 담고, 별도 재조회는 하지 않는다.
+    let onhadaPublicArtworkDetailOpen = false;
+    let onhadaPublicArtworkDetailArtworks = [];
+    let onhadaPublicArtworkDetailExhibitionId = null;
+    let onhadaPublicArtworkDetailIndex = -1;
+    let onhadaPublicArtworkDetailRequestSeq = 0;
+    let onhadaPublicArtworkDetailBlobUrls = new Map();
+    let onhadaPublicArtworkDetailPreviousFocus = null;
+
+    // PDF "새 창에서 보기" 전용 리소스. 상세 미리보기(iframe)용 blob URL과
+    // 완전히 분리된 별도 object URL들을 담는다 - 모달을 닫거나 다른 작품으로
+    // 이동해 미리보기용 URL이 revoke되더라도 이미 열린 새 창에는 영향이
+    // 없어야 하기 때문이다. Map<blobUrl, timerId> 구조라 같은 PDF를 여러 번
+    // 새 창으로 열어도 각 URL·타이머 쌍이 서로 덮어쓰지 않고 독립적으로
+    // 관리된다.
+    let onhadaPublicArtworkDetailPdfWindowResources = new Map();
     let onhadaAdminExhibitions = [];
     let onhadaAdminExhibitionsRequestSeq = 0;
     // 전시관 공개/비공개 전환 전용 잠금. "요청 세대" 역할은 새로 만들지 않고
