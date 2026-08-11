@@ -3565,10 +3565,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260811-1"></script>
-  <script src="js/auth-service.js?v=20260811-1"></script>
-  <script src="js/db-service.js?v=20260811-1"></script>
-  <script src="js/storage-service.js?v=20260811-1"></script>
+  <script src="js/supabase-client.js?v=20260811-2"></script>
+  <script src="js/auth-service.js?v=20260811-2"></script>
+  <script src="js/db-service.js?v=20260811-2"></script>
+  <script src="js/storage-service.js?v=20260811-2"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -5146,6 +5146,12 @@
     let onhadaPublicArtworkBlobUrls = new Map();
     let onhadaAdminExhibitions = [];
     let onhadaAdminExhibitionsRequestSeq = 0;
+    // 전시관 공개/비공개 전환 전용 잠금. "요청 세대" 역할은 새로 만들지 않고
+    // 위 onhadaAdminExhibitionsRequestSeq를 그대로 재사용한다 - 그 값은 이미
+    // renderAdminCloudExhibitions()가 목록을 다시 불러올 때마다 증가하므로
+    // "그 사이 목록이 바뀌었는지" 판정에 그대로 쓸 수 있다(아래 logoutAdmin()에도
+    // 로그아웃 시 증가하도록 한 줄 추가한다).
+    let onhadaAdminPublicationActionInProgress = false;
     let onhadaAdminEntrancePreviewOpen = false;
     let onhadaAdminEntrancePreviewPreviousFocus = null;
     let onhadaAdminEntrancePreviewExhibitionId = null;
@@ -5266,6 +5272,12 @@
         onhadaAdminExhibitionManagers = [];
         onhadaAdminAssignableExhibitions = [];
         onhadaAdminAssignableManagers = [];
+        // 전시관 공개/비공개 전환이 진행 중이었다면 잠금을 풀고, 목록
+        // 재조회와 동일하게 요청 세대를 증가시켜 그 흐름이 더 이상 화면을
+        // 덮어쓰지 않게 한다(별도의 상태 메시지 DOM은 두지 않으므로 이
+        // 두 줄로 초기화가 끝난다).
+        onhadaAdminPublicationActionInProgress = false;
+        onhadaAdminExhibitionsRequestSeq += 1;
         switchView('browse');
       }
       showAlertDialog("로그아웃 완료", "기관 권한 세션이 안전하게 자동 파기되었습니다.", "🔒");
@@ -7993,12 +8005,216 @@
           previewBtnRow.appendChild(managerPreviewBtn);
 
           row.appendChild(previewBtnRow);
+
+          // B: 공개/비공개 전환. 정확히 두 상태 조합에서만 버튼을 붙이고,
+          // 그 밖의 조합(unlisted/beta/ended, 서로 불일치하는 조합 포함)은
+          // 버튼 없이 안내 문구만 보여준다. UUID는 이 클로저에서만 참조하고
+          // DOM에는 index만 넘긴다(위 미리보기 버튼과 동일한 원칙).
+          const publicationRow = document.createElement('div');
+          publicationRow.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin-top: 10px; align-items:center;";
+
+          if (ex.visibility === 'private' && ex.operation_status === 'preparing') {
+            const publishBtn = document.createElement('button');
+            publishBtn.className = 'btn-hero-primary';
+            publishBtn.style.cssText = "font-size: 0.85rem; padding: 6px 16px;";
+            publishBtn.textContent = '전시관 공개하기';
+            publishBtn.addEventListener('click', () => onhadaPublishAdminExhibition(index));
+            publicationRow.appendChild(publishBtn);
+
+            const publishNotice = document.createElement('span');
+            publishNotice.style.cssText = "color:var(--text-gray); font-size:0.75rem;";
+            publishNotice.textContent = '담당 운영자와 승인 작품을 확인한 뒤 공개하세요.';
+            publicationRow.appendChild(publishNotice);
+          } else if (ex.visibility === 'public' && ex.operation_status === 'operating') {
+            const unpublishBtn = document.createElement('button');
+            unpublishBtn.className = 'btn-reject';
+            unpublishBtn.style.cssText = "font-size: 0.85rem; padding: 6px 16px;";
+            unpublishBtn.textContent = '비공개 전환';
+            unpublishBtn.addEventListener('click', () => onhadaUnpublishAdminExhibition(index));
+            publicationRow.appendChild(unpublishBtn);
+
+            const publicNotice = document.createElement('span');
+            publicNotice.style.cssText = "color:var(--text-gray); font-size:0.75rem;";
+            publicNotice.textContent = '현재 플랫폼 전시관 목록에 공개 중입니다.';
+            publicationRow.appendChild(publicNotice);
+          } else {
+            const otherNotice = document.createElement('span');
+            otherNotice.style.cssText = "color:var(--text-gray); font-size:0.75rem;";
+            otherNotice.textContent = '현재 상태는 자동 전환 대상이 아닙니다. 관리자 확인이 필요합니다.';
+            publicationRow.appendChild(otherNotice);
+          }
+
+          row.appendChild(publicationRow);
         }
 
         if (listEl) listEl.appendChild(row);
       });
 
       onhadaRenderAdminAssignableExhibitionSelects();
+    }
+
+    // 전시관 공개하기. 확인 전에 담당 운영자·작품 승인 현황을 다시 조회해
+    // 차단 조건을 검사하고, 확인 모달에 그 통계를 그대로 보여준다. 잠금은
+    // 통계 조회 시작 시점부터(확인 모달이 열려 있는 동안 포함) 끝까지 유지해
+    // 더블클릭·중복 요청을 원천 차단한다.
+    async function onhadaPublishAdminExhibition(index) {
+      // 1. admin 인증
+      if (!isAdminAuthenticated) return;
+      // 2. 작업 잠금
+      if (onhadaAdminPublicationActionInProgress) return;
+      // 3. index 유효
+      if (!Array.isArray(onhadaAdminExhibitions) || index < 0 || index >= onhadaAdminExhibitions.length) return;
+      // 4. 대상 전시관 존재
+      const exhibition = onhadaAdminExhibitions[index];
+      if (!exhibition) return;
+      // 5. 외부 전시관 아님
+      if (exhibition.is_external) return;
+      // 6. 현재 상태가 정확히 private/preparing
+      if (exhibition.visibility !== 'private' || exhibition.operation_status !== 'preparing') return;
+
+      const exhibitionId = exhibition.id;
+      const exhibitionTitle = (typeof exhibition.title === 'string' && exhibition.title) ? exhibition.title : '(제목 없음)';
+      // 7. 요청 세대 토큰 기록(목록이 그 사이 재조회되거나 로그아웃되면 값이 바뀐다)
+      const requestSeq = onhadaAdminExhibitionsRequestSeq;
+
+      onhadaAdminPublicationActionInProgress = true;
+
+      try {
+        let managersResult;
+        let artworksResult;
+        try {
+          [managersResult, artworksResult] = await Promise.all([
+            window.ONHADA_BACKEND.db.getExhibitionManagers(exhibitionId),
+            window.ONHADA_BACKEND.db.getArtworksForAdminExhibition(exhibitionId)
+          ]);
+        } catch (err) {
+          managersResult = { ok: false, managers: [], error: null };
+          artworksResult = { ok: false, artworks: [], error: null };
+        }
+
+        // 통계 조회 도중 목록이 재조회되었거나 로그아웃됐으면 UPDATE로 진행하지 않는다.
+        if (requestSeq !== onhadaAdminExhibitionsRequestSeq || !isAdminAuthenticated) return;
+
+        if (!managersResult.ok || !artworksResult.ok) {
+          showAlertDialog('공개 확인 실패', '전시관 공개 여부를 확인하지 못했습니다. 다시 시도해 주세요.', '⚠️');
+          return;
+        }
+
+        const managerCount = managersResult.managers.length;
+        const artworks = artworksResult.artworks;
+        const totalCount = artworks.length;
+        const approvedCount = artworks.filter(a => a.status === 'approved').length;
+        const pendingCount = artworks.filter(a => a.status === 'pending').length;
+        const rejectedCount = artworks.filter(a => a.status === 'rejected').length;
+        const hiddenCount = artworks.filter(a => a.status === 'hidden').length;
+
+        if (managerCount === 0) {
+          showAlertDialog('공개 불가', '담당 운영자를 한 명 이상 배정한 뒤 공개할 수 있습니다.', '⚠️');
+          return;
+        }
+
+        if (approvedCount === 0) {
+          showAlertDialog('공개 불가', '승인 완료 작품이 한 개 이상 있어야 공개할 수 있습니다.', '⚠️');
+          return;
+        }
+
+        const confirmMessage = '"' + exhibitionTitle + '" 전시관을 공개합니다. 담당 운영자 ' + managerCount
+          + '명, 전체 작품 ' + totalCount + '건(승인 완료 ' + approvedCount + ', 승인 대기 ' + pendingCount
+          + ', 반려 ' + rejectedCount + ', 숨김 ' + hiddenCount + '). 공개하는 즉시 승인 완료 작품이 플랫폼 '
+          + '관람객에게 표시됩니다. 승인 대기·반려·숨김 작품은 표시되지 않습니다.';
+
+        const confirmed = await onhadaConfirmAction(confirmMessage, {
+          title: '전시관 공개 확인',
+          confirmLabel: '전시관 공개',
+          cancelLabel: '취소',
+          danger: false
+        });
+        if (!confirmed) return;
+
+        // 확인 이후 다시 stale/admin 상태를 검사한 뒤에만 UPDATE를 호출한다.
+        if (requestSeq !== onhadaAdminExhibitionsRequestSeq || !isAdminAuthenticated) return;
+
+        let updateResult;
+        try {
+          updateResult = await window.ONHADA_BACKEND.db.setExhibitionPublicationAsAdmin(exhibitionId, true);
+        } catch (err) {
+          updateResult = { ok: false, exhibition: null, error: { code: 'unexpected_error', message: '전시관 공개 처리 중 오류가 발생했습니다.' } };
+        }
+
+        if (!updateResult.ok) {
+          showAlertDialog('공개 실패', (updateResult.error && updateResult.error.message) || '전시관 공개에 실패했습니다.', '⚠️');
+          return;
+        }
+
+        if (isAdminAuthenticated) {
+          showAlertDialog('공개 완료', '전시관이 공개되었습니다. 승인 완료 작품이 관람객에게 표시됩니다.', '✔️');
+          renderAdminCloudExhibitions();
+        }
+        // 공개 관람 목록 캐시도 함께 갱신한다 - 이 호출은 admin 세션과
+        // 무관하게 항상 안전하다(공개 브라우즈 화면 자체 상태만 건드림).
+        onhadaLoadPublicExhibitions();
+      } finally {
+        onhadaAdminPublicationActionInProgress = false;
+      }
+    }
+
+    // 전시관 비공개 전환. 공개하기와 달리 별도 통계 조회 없이 바로 확인
+    // 모달을 연다(등록된 작품/운영자 배정은 그대로 유지되므로 사전 차단
+    // 조건이 없다).
+    async function onhadaUnpublishAdminExhibition(index) {
+      if (!isAdminAuthenticated) return;
+      if (onhadaAdminPublicationActionInProgress) return;
+      if (!Array.isArray(onhadaAdminExhibitions) || index < 0 || index >= onhadaAdminExhibitions.length) return;
+
+      const exhibition = onhadaAdminExhibitions[index];
+      if (!exhibition) return;
+      if (exhibition.is_external) return;
+      if (exhibition.visibility !== 'public' || exhibition.operation_status !== 'operating') return;
+
+      const exhibitionId = exhibition.id;
+      const exhibitionTitle = (typeof exhibition.title === 'string' && exhibition.title) ? exhibition.title : '(제목 없음)';
+      const requestSeq = onhadaAdminExhibitionsRequestSeq;
+
+      onhadaAdminPublicationActionInProgress = true;
+
+      try {
+        const confirmed = await onhadaConfirmAction(
+          '"' + exhibitionTitle + '" 비공개로 전환하면 플랫폼 전시관 목록에서 즉시 사라지고 관람객은 작품을 볼 수 없습니다. 등록된 작품과 운영자 배정은 삭제되지 않습니다.',
+          {
+            title: '전시관 비공개 전환',
+            confirmLabel: '비공개 전환',
+            cancelLabel: '취소',
+            // danger:true는 삭제 버튼과 같은 붉은 스타일을 쓰지만, 본문에서
+            // "삭제되지 않습니다"를 명시해 실제 삭제와 혼동되지 않게 한다.
+            // 기본 포커스를 취소로 두려면(요구사항) onhadaConfirmAction()의
+            // 기존 로직상 danger:true 경로가 필요하다.
+            danger: true
+          }
+        );
+        if (!confirmed) return;
+
+        if (requestSeq !== onhadaAdminExhibitionsRequestSeq || !isAdminAuthenticated) return;
+
+        let updateResult;
+        try {
+          updateResult = await window.ONHADA_BACKEND.db.setExhibitionPublicationAsAdmin(exhibitionId, false);
+        } catch (err) {
+          updateResult = { ok: false, exhibition: null, error: { code: 'unexpected_error', message: '전시관 비공개 처리 중 오류가 발생했습니다.' } };
+        }
+
+        if (!updateResult.ok) {
+          showAlertDialog('비공개 전환 실패', (updateResult.error && updateResult.error.message) || '전시관 비공개 전환에 실패했습니다.', '⚠️');
+          return;
+        }
+
+        if (isAdminAuthenticated) {
+          showAlertDialog('비공개 전환 완료', '전시관을 비공개·준비 중 상태로 전환했습니다.', '✔️');
+          renderAdminCloudExhibitions();
+        }
+        onhadaLoadPublicExhibitions();
+      } finally {
+        onhadaAdminPublicationActionInProgress = false;
+      }
     }
 
     async function onhadaSubmitAdminExhibition(event) {
