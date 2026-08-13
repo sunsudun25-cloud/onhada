@@ -541,6 +541,94 @@
         return true;
     }
 
+    // 외부(Lovable 등) MP4 직접 링크 전용 검증. UI(app.html)가 이미 같은
+    // 종류의 검증을 하더라도, 이 함수는 그 결과를 신뢰하지 않고 여기서
+    // 다시 독립적으로 검증한다 - 이 파일의 다른 화이트리스트 검증(제목/
+    // 작가명/동의 등)과 동일한 원칙이다. DNS 조회나 실제 파일 접근은 하지
+    // 않고(브라우저에서 네트워크 요청 없이 판단 가능한) 문자열 구조만
+    // 검사한다.
+    var EXTERNAL_VIDEO_URL_MAX_LENGTH = 2048;
+
+    // IPv4 주소의 첫째·둘째 옥텟(a, b)이 루프백(127.x) 또는 사설 대역
+    // (10.x, 172.16~31.x, 192.168.x, 169.254.x) 또는 미지정(0.x)에
+    // 속하는지 판정한다. isValidExternalVideoUrl()이 일반 IPv4 표기와
+    // IPv4-매핑 IPv6 표기 양쪽에서 공통으로 사용한다.
+    function isPrivateOrLoopbackIPv4Octets(a, b) {
+        return a === 10 || a === 127 || a === 0
+            || (a === 172 && b >= 16 && b <= 31)
+            || (a === 192 && b === 168)
+            || (a === 169 && b === 254);
+    }
+
+    function isValidExternalVideoUrl(url) {
+        if (typeof url !== 'string' || url.length === 0 || url.length > EXTERNAL_VIDEO_URL_MAX_LENGTH) {
+            return false;
+        }
+
+        var parsed;
+        try {
+            parsed = new URL(url);
+        } catch (err) {
+            return false;
+        }
+
+        if (parsed.protocol !== 'https:') return false;
+        if (parsed.username || parsed.password) return false;
+        if (parsed.port) return false;
+        if (parsed.hash) return false;
+        if (!/\.mp4$/i.test(parsed.pathname)) return false;
+
+        // new URL()은 IPv4 8진수·정수·16진수·축약 표기(예: "0177.0.0.1",
+        // "2130706433", "0x7f000001", "127.1")를 이미 표준 점십진수로,
+        // IPv6는 압축 표기로 정규화한다. 아래 검사는 원본 문자열의 표기
+        // 방식이 아니라 이 "최종 정규화된" hostname이 실제로 가리키는
+        // 주소를 기준으로 판단하므로 표기 방식을 바꾸는 우회에 영향받지 않는다.
+        var hostname = parsed.hostname.toLowerCase();
+
+        // 끝에 마침표가 붙은 호스트(FQDN 루트 표기, 예: "localhost.")는
+        // 마침표를 지우고 다시 검사하지 않고 그 자체로 차단한다 - 지운 뒤
+        // 검사하면 "localhost."가 "localhost"와 다른 문자열이라는 이유로
+        // 아래 리터럴 차단을 우회하게 된다.
+        if (hostname.charAt(hostname.length - 1) === '.') {
+            return false;
+        }
+
+        if (hostname === 'localhost') {
+            return false;
+        }
+
+        var ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (ipv4Match) {
+            var octets = [
+                parseInt(ipv4Match[1], 10),
+                parseInt(ipv4Match[2], 10),
+                parseInt(ipv4Match[3], 10),
+                parseInt(ipv4Match[4], 10)
+            ];
+            if (octets.some(function (n) { return n > 255; })) return false;
+            if (isPrivateOrLoopbackIPv4Octets(octets[0], octets[1])) return false;
+        }
+
+        if (hostname.indexOf(':') !== -1) {
+            var v6 = hostname.replace(/^\[/, '').replace(/\]$/, '');
+            if (v6 === '::1' || v6.indexOf('fe80:') === 0 || v6.indexOf('fc00:') === 0 || v6.indexOf('fd00:') === 0) {
+                return false;
+            }
+            // IPv4-매핑 IPv6("::ffff:127.0.0.1" 같은 주소는 new URL()에 의해
+            // "::ffff:7f00:1" 형태의 16진수 압축 표기로 정규화된다)에 내장된
+            // IPv4 주소를 16진수 두 그룹에서 복원해 동일한 사설/루프백 판정을 적용한다.
+            var mappedMatch = v6.match(/^::ffff:([0-9a-f]{1,4}):(?:[0-9a-f]{1,4})$/);
+            if (mappedMatch) {
+                var hi = parseInt(mappedMatch[1], 16);
+                var mappedA = (hi >> 8) & 0xff;
+                var mappedB = hi & 0xff;
+                if (isPrivateOrLoopbackIPv4Octets(mappedA, mappedB)) return false;
+            }
+        }
+
+        return true;
+    }
+
     // 이 함수는 storage-service.js를 직접 호출하지 않는다. 이미지 업로드는
     // 이 함수 호출 이전에 이미 완료되어 media_path로 전달되어야 하며,
     // 이 INSERT가 실패했을 때 방금 올린 Storage 파일을 보상 삭제하는 책임은
@@ -689,6 +777,9 @@
         const mediaPath = typeof input.media_path === 'string' ? input.media_path : '';
         // video 전용 - image/document는 이 필드를 아예 보내지 않는다(무시됨).
         const thumbnailPath = typeof input.thumbnail_path === 'string' ? input.thumbnail_path : '';
+        // video의 외부 링크 방식 전용 - image/document/직접 업로드 영상은
+        // 이 필드를 아예 보내지 않는다(무시됨).
+        const externalUrl = typeof input.external_url === 'string' ? input.external_url.trim() : '';
 
         // 3. media_type이 image/document/video인지 (text/audio/mixed는 차단)
         if (['image', 'document', 'video'].indexOf(mediaType) === -1) {
@@ -720,8 +811,20 @@
             return { ok: false, artwork: null, error: safeError('consent_required', '전시 동의 확인이 필요합니다.') };
         }
 
-        // 9. media_path 필수(형식 상세 검증은 14번에서)
-        if (!mediaPath) {
+        // 9. media_path 필수 여부. video는 직접 업로드(media_path)와 외부
+        //    링크(external_url) 중 정확히 하나만 제공돼야 한다. image/document는
+        //    기존과 동일하게 media_path가 항상 필수다(형식 상세 검증은 14번에서).
+        if (mediaType === 'video') {
+            const hasMediaPath = mediaPath.length > 0;
+            const hasExternalUrl = externalUrl.length > 0;
+
+            if (hasMediaPath && hasExternalUrl) {
+                return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상은 직접 업로드 또는 외부 링크 중 하나만 등록할 수 있습니다.') };
+            }
+            if (!hasMediaPath && !hasExternalUrl) {
+                return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상 파일 또는 외부 링크 중 하나는 반드시 등록해야 합니다.') };
+            }
+        } else if (!mediaPath) {
             return { ok: false, artwork: null, error: safeError('invalid_media_path', '작품 파일 경로 정보가 올바르지 않습니다.') };
         }
 
@@ -771,38 +874,57 @@
         // 14. media_path가 exhibitionId 폴더와 정확히 일치하는지 + media_type별 규칙
         //     image   : 기존 이미지 path(jpg/png/webp)만 허용, pdf 경로는 거부
         //     document: PDF path 또는 기존 이미지 path 모두 허용
-        //     video   : media_path는 반드시 .mp4, thumbnail_path는 반드시 이미지
-        //               path이며 media_path와 서로 달라야 한다(둘 다 필수).
+        //     video(직접 업로드) : media_path는 반드시 .mp4, thumbnail_path는
+        //               반드시 이미지 path이며 media_path와 서로 달라야 한다.
+        //     video(외부 링크)   : media_path는 비워두고(위 9번에서 이미 확인),
+        //               external_url이 HTTPS MP4 직접 링크 형식이어야 하며
+        //               thumbnail_path는 여전히 필수(이미지 경로).
         const isImagePath = isValidManagedImagePath(mediaPath, exhibitionId);
         const isPdfPath = isValidManagedDocumentPdfPath(mediaPath, exhibitionId);
 
         let thumbnailUrlForPayload = null;
+        let mediaUrlForPayload = null;
+        let externalUrlForPayload = null;
 
         if (mediaType === 'image') {
             if (!isImagePath) {
                 return { ok: false, artwork: null, error: safeError('invalid_media_path', '이미지 경로 정보가 올바르지 않습니다.') };
             }
             thumbnailUrlForPayload = mediaPath;
+            mediaUrlForPayload = mediaPath;
         } else if (mediaType === 'document') {
             if (!isImagePath && !isPdfPath) {
                 return { ok: false, artwork: null, error: safeError('invalid_media_path', '문서 경로 정보가 올바르지 않습니다.') };
             }
             thumbnailUrlForPayload = isImagePath ? mediaPath : null;
+            mediaUrlForPayload = mediaPath;
         } else {
-            // mediaType === 'video'
-            const isVideoPath = isValidManagedVideoPath(mediaPath, exhibitionId);
+            // mediaType === 'video' - 썸네일은 방식과 무관하게 항상 필수.
             const isThumbnailImagePath = isValidManagedImagePath(thumbnailPath, exhibitionId);
-
-            if (!isVideoPath) {
-                return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상 경로 정보가 올바르지 않습니다.') };
-            }
             if (!isThumbnailImagePath) {
                 return { ok: false, artwork: null, error: safeError('invalid_thumbnail_path', '썸네일 경로 정보가 올바르지 않습니다.') };
             }
-            if (mediaPath === thumbnailPath) {
-                return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상과 썸네일 경로는 서로 달라야 합니다.') };
-            }
             thumbnailUrlForPayload = thumbnailPath;
+
+            if (mediaPath) {
+                // 직접 업로드
+                const isVideoPath = isValidManagedVideoPath(mediaPath, exhibitionId);
+                if (!isVideoPath) {
+                    return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상 경로 정보가 올바르지 않습니다.') };
+                }
+                if (mediaPath === thumbnailPath) {
+                    return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상과 썸네일 경로는 서로 달라야 합니다.') };
+                }
+                mediaUrlForPayload = mediaPath;
+                externalUrlForPayload = null;
+            } else {
+                // 외부 링크
+                if (!isValidExternalVideoUrl(externalUrl)) {
+                    return { ok: false, artwork: null, error: safeError('invalid_external_url', '외부 영상 링크 형식이 올바르지 않습니다.') };
+                }
+                mediaUrlForPayload = null;
+                externalUrlForPayload = externalUrl;
+            }
         }
 
         const payload = {
@@ -813,8 +935,8 @@
             artist_display_name: artistDisplayName,
             description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
             thumbnail_url: thumbnailUrlForPayload,
-            media_url: mediaPath,
-            external_url: null,
+            media_url: mediaUrlForPayload,
+            external_url: externalUrlForPayload,
             status: 'pending',
             consent_confirmed: true,
             consent_scope: 'online_exhibition_confirmed_by_operator',
