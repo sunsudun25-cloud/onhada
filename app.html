@@ -2998,9 +2998,9 @@
               <strong style="display:block; margin-bottom:4px;">문서 작품</strong>
               <span style="font-size:0.8rem; color:var(--text-gray);">글, 시, 동화책, 문집</span>
             </button>
-            <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-type-video-btn" disabled style="display:block !important; height:auto !important; text-align:left; padding:16px; opacity:0.5; cursor:not-allowed;">
-              <strong style="display:block; margin-bottom:4px;">영상 작품 (준비 중)</strong>
-              <span style="font-size:0.8rem; color:var(--text-gray);">영상 등록은 다음 단계에서 지원됩니다.</span>
+            <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-type-video-btn" onclick="onhadaManagerUnifiedSelectType('video')" style="display:block !important; height:auto !important; text-align:left; padding:16px;">
+              <strong style="display:block; margin-bottom:4px;">영상 작품</strong>
+              <span style="font-size:0.8rem; color:var(--text-gray);">직접 촬영·제작한 MP4 영상</span>
             </button>
           </div>
 
@@ -3015,6 +3015,29 @@
               <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">문서 파일</label>
               <input type="file" id="onhada-manager-unified-file-document" class="form-control" accept="application/pdf,image/jpeg,image/png,image/webp" onchange="onhadaManagerUnifiedHandleFileChange(this)" style="margin-bottom:8px;">
               <p style="color:var(--text-gray); font-size:0.8rem; margin-bottom:14px;">PDF는 20MB 이하, 이미지(JPG/PNG/WEBP)는 5MB 이하</p>
+            </div>
+            <!-- 영상 작품 전용. 이미지/문서 wrap과 완전히 분리된 영역이며, 이
+                 영역이 보일 때는 이미지/문서 wrap이 둘 다 숨겨진다. -->
+            <div id="onhada-manager-unified-file-video-wrap" style="display:none;">
+              <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">MP4 영상 선택</label>
+              <input type="file" id="onhada-manager-unified-file-video" class="form-control" accept="video/mp4" onchange="onhadaManagerUnifiedHandleFileChange(this)" style="margin-bottom:8px;">
+              <p style="color:var(--text-gray); font-size:0.8rem; margin-bottom:14px;">MP4 · 50MB 이하</p>
+
+              <div id="onhada-manager-unified-video-preview-wrap" style="display:none; margin-bottom:14px;">
+                <video id="onhada-manager-unified-video-preview" controls playsinline style="width:100%; border-radius:10px; display:block; background:#000; margin-bottom:8px;"></video>
+                <label style="color:var(--text-gray); font-size:0.8rem; display:block; margin-bottom:4px;">영상 재생 위치 조절</label>
+                <input type="range" id="onhada-manager-unified-video-seek" min="0" max="100" value="0" step="0.1" style="width:100%; margin-bottom:10px;">
+
+                <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-capture-btn" onclick="onhadaManagerUnifiedCaptureVideoThumbnail()" style="width:100%; margin-bottom:10px;">현재 장면을 썸네일로 캡처</button>
+
+                <div id="onhada-manager-unified-thumbnail-wrap" style="display:none;">
+                  <label style="color:var(--text-gray); font-size:0.8rem; display:block; margin-bottom:4px;">캡처된 썸네일</label>
+                  <img id="onhada-manager-unified-thumbnail-preview" alt="캡처된 썸네일 미리보기" style="max-width:100%; border-radius:10px; display:block; margin-bottom:8px;">
+                  <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-recapture-btn" onclick="onhadaManagerUnifiedCaptureVideoThumbnail()" style="width:100%;">다시 캡처</button>
+                </div>
+              </div>
+
+              <p id="onhada-manager-unified-video-upload-status" style="color:var(--text-gray); font-size:0.8rem; margin-top:8px;"></p>
             </div>
             <div id="onhada-manager-unified-file-preview" style="margin-top:6px;"></div>
           </div>
@@ -3590,10 +3613,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260811-3"></script>
-  <script src="js/auth-service.js?v=20260811-3"></script>
-  <script src="js/db-service.js?v=20260811-3"></script>
-  <script src="js/storage-service.js?v=20260811-3"></script>
+  <script src="js/supabase-client.js?v=20260811-4"></script>
+  <script src="js/auth-service.js?v=20260811-4"></script>
+  <script src="js/db-service.js?v=20260811-4"></script>
+  <script src="js/storage-service.js?v=20260811-4"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -5561,6 +5584,13 @@
     let onhadaManagerUnifiedSubmitting = false;
     let onhadaManagerUnifiedRequestToken = 0;
     let onhadaManagerUnifiedCategoriesPopulated = false;
+    // 영상 작품 전용 상태. onhadaManagerUnifiedFile/PreviewUrl은 영상일 때도
+    // 그대로 재사용한다(파일 자체와 <video> 미리보기 object URL). 여기 담는
+    // 값은 오직 "캡처된 썸네일" 관련 상태뿐이다 - 이미지/문서 흐름과 완전히
+    // 분리해 서로 건드리지 않는다.
+    let onhadaManagerUnifiedThumbnailBlob = null;
+    let onhadaManagerUnifiedThumbnailPreviewUrl = null;
+    let onhadaManagerUnifiedThumbnailCapturing = false;
     // 본인 작품 수정 모드 전용 상태. 별도의 요청 세대 토큰을 두지 않고
     // 기존 onhadaManagerUnifiedRequestToken을 그대로 재사용한다 - 위저드는
     // 신규 등록과 수정 모드를 동시에 가질 수 없으므로 하나의 토큰으로
@@ -6263,6 +6293,15 @@
         onhadaManagerUnifiedPreviewUrl = null;
       }
 
+      // 영상 썸네일 캡처 미리보기 object URL도 함께 정리한다(onhadaManagerUnifiedPreviewUrl과
+      // 완전히 별개의 URL이므로 위 revoke와 별도로 처리해야 한다).
+      if (onhadaManagerUnifiedThumbnailPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedThumbnailPreviewUrl);
+        onhadaManagerUnifiedThumbnailPreviewUrl = null;
+      }
+      onhadaManagerUnifiedThumbnailBlob = null;
+      onhadaManagerUnifiedThumbnailCapturing = false;
+
       onhadaManagerUnifiedStep = 1;
       onhadaManagerUnifiedMediaType = null;
       onhadaManagerUnifiedFile = null;
@@ -6286,9 +6325,16 @@
       const consentEl = document.getElementById('onhada-manager-unified-consent');
       const fileImageEl = document.getElementById('onhada-manager-unified-file-image');
       const fileDocEl = document.getElementById('onhada-manager-unified-file-document');
+      const fileVideoEl = document.getElementById('onhada-manager-unified-file-video');
       const previewEl = document.getElementById('onhada-manager-unified-file-preview');
       const statusEl = document.getElementById('onhada-manager-unified-status');
       const summaryEl = document.getElementById('onhada-manager-unified-summary-body');
+      const videoPreviewWrapEl = document.getElementById('onhada-manager-unified-video-preview-wrap');
+      const videoPreviewEl = document.getElementById('onhada-manager-unified-video-preview');
+      const videoSeekEl = document.getElementById('onhada-manager-unified-video-seek');
+      const thumbnailWrapEl = document.getElementById('onhada-manager-unified-thumbnail-wrap');
+      const thumbnailPreviewEl = document.getElementById('onhada-manager-unified-thumbnail-preview');
+      const videoUploadStatusEl = document.getElementById('onhada-manager-unified-video-upload-status');
 
       if (titleEl) titleEl.value = "";
       if (authorEl) authorEl.value = "";
@@ -6297,9 +6343,16 @@
       if (consentEl) consentEl.checked = false;
       if (fileImageEl) fileImageEl.value = "";
       if (fileDocEl) fileDocEl.value = "";
+      if (fileVideoEl) fileVideoEl.value = "";
       if (previewEl) previewEl.innerHTML = "";
       if (statusEl) statusEl.textContent = "";
       if (summaryEl) summaryEl.innerHTML = "";
+      if (videoPreviewWrapEl) videoPreviewWrapEl.style.display = 'none';
+      if (videoPreviewEl) videoPreviewEl.removeAttribute('src');
+      if (videoSeekEl) videoSeekEl.value = "0";
+      if (thumbnailWrapEl) thumbnailWrapEl.style.display = 'none';
+      if (thumbnailPreviewEl) thumbnailPreviewEl.removeAttribute('src');
+      if (videoUploadStatusEl) videoUploadStatusEl.textContent = "";
     }
 
     // manager 인증 상태에서 정상 초기화된 경우에만 기존 두 폼을 숨긴다.
@@ -6362,7 +6415,10 @@
 
       if (step === 2) {
         if (stepDescEl) {
-          if (onhadaManagerUnifiedEditMode) {
+          if (onhadaManagerUnifiedMediaType === 'video') {
+            // 수정 모드는 video에서 도달하지 않는 경로이므로 등록 문구만 둔다.
+            stepDescEl.textContent = 'MP4 영상을 선택하고, 재생 위치를 옮겨 장면을 썸네일로 캡처하세요.';
+          } else if (onhadaManagerUnifiedEditMode) {
             stepDescEl.textContent = onhadaManagerUnifiedMediaType === 'document'
               ? '새 파일을 선택하지 않으면 현재 파일을 유지합니다. 교체하려면 PDF 또는 이미지(JPG/PNG/WEBP) 파일을 선택하세요.'
               : '새 파일을 선택하지 않으면 현재 파일을 유지합니다. 교체하려면 이미지(JPG/PNG/WEBP) 파일을 선택하세요.';
@@ -6374,8 +6430,10 @@
         }
         const imageWrap = document.getElementById('onhada-manager-unified-file-image-wrap');
         const docWrap = document.getElementById('onhada-manager-unified-file-document-wrap');
+        const videoWrap = document.getElementById('onhada-manager-unified-file-video-wrap');
         if (imageWrap) imageWrap.style.display = onhadaManagerUnifiedMediaType === 'image' ? 'block' : 'none';
         if (docWrap) docWrap.style.display = onhadaManagerUnifiedMediaType === 'document' ? 'block' : 'none';
+        if (videoWrap) videoWrap.style.display = onhadaManagerUnifiedMediaType === 'video' ? 'block' : 'none';
       } else if (stepDescEl) {
         stepDescEl.textContent = meta.desc;
       }
@@ -6396,12 +6454,75 @@
       }
     }
 
-    // 1단계 카드 클릭. video는 이 함수 자체가 호출되지 않도록 버튼에
-    // disabled만 걸어 두었다(onclick 미부여) - 여기서도 방어적으로
-    // image/document만 허용한다.
+    // 영상 미리보기/썸네일 캡처 전용 DOM 상태를 전부 초기 표시로 되돌린다.
+    // onhadaManagerUnifiedThumbnailPreviewUrl(캡처 미리보기)은 이 함수가 아니라
+    // 호출자가 필요할 때 직접 revoke한다(여기서는 화면만 정리).
+    function onhadaResetManagerUnifiedVideoPreviewUi() {
+      const videoPreviewWrapEl = document.getElementById('onhada-manager-unified-video-preview-wrap');
+      const videoPreviewEl = document.getElementById('onhada-manager-unified-video-preview');
+      const videoSeekEl = document.getElementById('onhada-manager-unified-video-seek');
+      const thumbnailWrapEl = document.getElementById('onhada-manager-unified-thumbnail-wrap');
+      const thumbnailPreviewEl = document.getElementById('onhada-manager-unified-thumbnail-preview');
+      const videoUploadStatusEl = document.getElementById('onhada-manager-unified-video-upload-status');
+
+      if (videoPreviewWrapEl) videoPreviewWrapEl.style.display = 'none';
+      if (videoPreviewEl) videoPreviewEl.removeAttribute('src');
+      if (videoSeekEl) videoSeekEl.value = "0";
+      if (thumbnailWrapEl) thumbnailWrapEl.style.display = 'none';
+      if (thumbnailPreviewEl) thumbnailPreviewEl.removeAttribute('src');
+      if (videoUploadStatusEl) videoUploadStatusEl.textContent = "";
+    }
+
+    // 현재 선택된 파일/미리보기/캡처 썸네일 상태를 전부 정리한다(object URL
+    // revoke + 상태 null화 + 파일 입력 3개 초기화 + 미리보기 영역 비우기).
+    // onhadaManagerUnifiedHandleFileChange()가 새 파일을 처리하기 직전과,
+    // onhadaManagerUnifiedSelectType()이 작품 종류를 바꾸기 직전(뒤로가기 후
+    // 다른 종류를 다시 고르는 경로) 양쪽에서 공용으로 쓴다 - 두 곳에 같은
+    // 정리 코드를 중복해서 두지 않기 위함이다.
+    // object URL revoke + 파일/썸네일 상태 null화 + 공용 미리보기 영역
+    // 비우기만 담당한다. 파일 입력(input[type=file])의 .value는 여기서
+    // 건드리지 않는다 - onhadaManagerUnifiedHandleFileChange()는 자신을
+    // 호출하게 만든 그 입력의 change 이벤트 처리 중이므로, 그 입력의
+    // .value를 여기서 지우면 브라우저 네이티브 "선택된 파일명" 표시가
+    // 방금 고른 파일임에도 즉시 "선택된 파일 없음"으로 보이는 혼란을 준다.
+    // 파일 입력 3개를 실제로 비워야 하는 곳(작품 종류 전환)은 호출부에서
+    // 별도로 처리한다.
+    function onhadaManagerUnifiedClearSelectedFileState() {
+      if (onhadaManagerUnifiedPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedPreviewUrl);
+        onhadaManagerUnifiedPreviewUrl = null;
+      }
+      if (onhadaManagerUnifiedThumbnailPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedThumbnailPreviewUrl);
+        onhadaManagerUnifiedThumbnailPreviewUrl = null;
+      }
+      onhadaManagerUnifiedThumbnailBlob = null;
+      onhadaManagerUnifiedFile = null;
+      onhadaResetManagerUnifiedVideoPreviewUi();
+
+      const previewEl = document.getElementById('onhada-manager-unified-file-preview');
+      if (previewEl) previewEl.innerHTML = "";
+    }
+
+    // 1단계 카드 클릭. 수정 모드(onhadaManagerUnifiedStartEdit)는 이 함수를
+    // 거치지 않고 곧바로 2단계로 진입하므로, video는 신규 등록 경로에서만
+    // 선택 가능하다(수정 모드 확장은 이번 단계 범위 밖). 뒤로가기로 1단계에
+    // 돌아와 다른 종류를 다시 고르는 경로를 대비해, 이전에 선택했던
+    // 파일·미리보기·캡처 썸네일 상태와 세 파일 입력 모두를 먼저 정리한 뒤
+    // 새 종류를 적용한다(여기서는 change 이벤트 처리 중이 아니므로 입력
+    // .value를 지워도 네이티브 표시 혼란이 없다).
     function onhadaManagerUnifiedSelectType(mediaType) {
       if (onhadaManagerUnifiedSubmitting) return;
-      if (['image', 'document'].indexOf(mediaType) === -1) return;
+      if (['image', 'document', 'video'].indexOf(mediaType) === -1) return;
+
+      onhadaManagerUnifiedClearSelectedFileState();
+
+      const fileImageEl = document.getElementById('onhada-manager-unified-file-image');
+      const fileDocEl = document.getElementById('onhada-manager-unified-file-document');
+      const fileVideoEl = document.getElementById('onhada-manager-unified-file-video');
+      if (fileImageEl) fileImageEl.value = "";
+      if (fileDocEl) fileDocEl.value = "";
+      if (fileVideoEl) fileVideoEl.value = "";
 
       onhadaManagerUnifiedMediaType = mediaType;
       onhadaManagerUnifiedStep = 2;
@@ -6413,21 +6534,52 @@
       const previewEl = document.getElementById('onhada-manager-unified-file-preview');
       const statusEl = document.getElementById('onhada-manager-unified-status');
 
-      if (onhadaManagerUnifiedPreviewUrl) {
-        URL.revokeObjectURL(onhadaManagerUnifiedPreviewUrl);
-        onhadaManagerUnifiedPreviewUrl = null;
-      }
+      // 새 파일을 고르면(또는 선택을 취소하면) 이전에 선택했던 파일과
+      // 캡처해 둔 썸네일은 더 이상 유효하지 않으므로 항상 함께 정리한다.
+      onhadaManagerUnifiedClearSelectedFileState();
+
       if (previewEl) previewEl.innerHTML = "";
       if (statusEl) statusEl.textContent = "";
 
       if (!(file instanceof File)) {
-        onhadaManagerUnifiedFile = null;
         return;
       }
 
       onhadaManagerUnifiedFile = file;
 
       const isImageMime = ['image/jpeg', 'image/png', 'image/webp'].indexOf(file.type) !== -1;
+
+      if (onhadaManagerUnifiedMediaType === 'video' && file.type === 'video/mp4') {
+        const url = URL.createObjectURL(file);
+        onhadaManagerUnifiedPreviewUrl = url;
+
+        const videoPreviewWrapEl = document.getElementById('onhada-manager-unified-video-preview-wrap');
+        const videoPreviewEl = document.getElementById('onhada-manager-unified-video-preview');
+        const videoSeekEl = document.getElementById('onhada-manager-unified-video-seek');
+
+        if (videoPreviewEl && videoSeekEl && videoPreviewWrapEl) {
+          videoPreviewEl.src = url;
+          videoPreviewWrapEl.style.display = 'block';
+
+          videoPreviewEl.addEventListener('loadedmetadata', function onLoaded() {
+            videoPreviewEl.removeEventListener('loadedmetadata', onLoaded);
+            const duration = videoPreviewEl.duration;
+            if (!(duration > 0) || !isFinite(duration)) return;
+
+            // 기본적으로 시작 후 약 1초 지점, 1초보다 짧은 영상은 중간 지점을 사용한다.
+            const targetTime = duration > 1 ? 1 : duration / 2;
+            videoSeekEl.max = String(duration);
+            videoSeekEl.value = String(targetTime);
+            videoPreviewEl.currentTime = targetTime;
+          }, { once: true });
+
+          videoSeekEl.oninput = function () {
+            const t = parseFloat(videoSeekEl.value);
+            if (isFinite(t)) videoPreviewEl.currentTime = t;
+          };
+        }
+        return;
+      }
 
       if (isImageMime) {
         const url = URL.createObjectURL(file);
@@ -6451,6 +6603,144 @@
           sizeP.textContent = onhadaFormatFileSize(file.size);
           previewEl.appendChild(sizeP);
         }
+      }
+    }
+
+    // 캔버스에 그린 프레임을 다운샘플링해 평균 밝기를 재는 값싼 검은 화면
+    // 판정. 전체 픽셀을 다 읽지 않고 작은 샘플 캔버스(32x18)로 축소해 그
+    // 결과만 검사한다 - 원본 캔버스 크기와 무관하게 항상 가볍다.
+    function onhadaIsCanvasFrameNearBlack(sourceCanvas) {
+      const sampleW = 32;
+      const sampleH = 18;
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = sampleW;
+      sampleCanvas.height = sampleH;
+      const sampleCtx = sampleCanvas.getContext('2d');
+      if (!sampleCtx) return false;
+
+      sampleCtx.drawImage(sourceCanvas, 0, 0, sampleW, sampleH);
+
+      let imageData;
+      try {
+        imageData = sampleCtx.getImageData(0, 0, sampleW, sampleH).data;
+      } catch (err) {
+        return false;
+      }
+
+      let total = 0;
+      const pixelCount = sampleW * sampleH;
+      for (let i = 0; i < imageData.length; i += 4) {
+        // 단순 평균 밝기(R+G+B)/3 - 정확한 휘도 공식일 필요는 없고
+        // "거의 완전한 검은 화면"만 걸러내면 충분하다.
+        total += (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
+      }
+
+      const avgBrightness = total / pixelCount;
+      return avgBrightness < 8;
+    }
+
+    // Blob을 quality를 낮춰가며 목표 용량(5MB) 이하가 될 때까지 재시도한다.
+    // webp를 우선 시도하고, 실패하거나(브라우저 미지원 등) 계속 5MB를
+    // 초과하면 jpeg로 한 번 더 시도한다. 그래도 실패하면 null을 반환한다.
+    async function onhadaEncodeThumbnailBlob(canvas) {
+      const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024;
+      const qualities = [0.85, 0.7, 0.5];
+
+      function toBlobAsync(mimeType, quality) {
+        return new Promise(function (resolve) {
+          try {
+            canvas.toBlob(function (result) { resolve(result); }, mimeType, quality);
+          } catch (err) {
+            resolve(null);
+          }
+        });
+      }
+
+      for (const mimeType of ['image/webp', 'image/jpeg']) {
+        for (const quality of qualities) {
+          const blob = await toBlobAsync(mimeType, quality);
+          if (blob && blob.type === mimeType && blob.size > 0 && blob.size <= MAX_THUMBNAIL_SIZE) {
+            return blob;
+          }
+        }
+      }
+
+      return null;
+    }
+
+    // "현재 장면을 썸네일로 캡처"/"다시 캡처" 버튼 공용 핸들러. 실패해도
+    // 예외를 던지지 않고 상태 메시지로만 안내하며, 실패 시 기존에 캡처해
+    // 두었던 썸네일이 있다면 그대로 유지한다(사용자가 다른 위치로 옮겨
+    // 다시 시도할 수 있게 하기 위함 - 실패했다고 이전 성공 결과까지
+    // 지우지는 않는다).
+    async function onhadaManagerUnifiedCaptureVideoThumbnail() {
+      if (onhadaManagerUnifiedThumbnailCapturing) return;
+      if (onhadaManagerUnifiedMediaType !== 'video') return;
+
+      const videoEl = document.getElementById('onhada-manager-unified-video-preview');
+      const statusEl = document.getElementById('onhada-manager-unified-video-upload-status');
+      const captureBtn = document.getElementById('onhada-manager-unified-capture-btn');
+      const recaptureBtn = document.getElementById('onhada-manager-unified-recapture-btn');
+      const thumbnailWrapEl = document.getElementById('onhada-manager-unified-thumbnail-wrap');
+      const thumbnailPreviewEl = document.getElementById('onhada-manager-unified-thumbnail-preview');
+
+      if (!videoEl || !(videoEl.videoWidth > 0) || !(videoEl.videoHeight > 0)) {
+        if (statusEl) statusEl.textContent = '영상을 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.';
+        return;
+      }
+
+      onhadaManagerUnifiedThumbnailCapturing = true;
+      if (captureBtn) captureBtn.disabled = true;
+      if (recaptureBtn) recaptureBtn.disabled = true;
+      if (statusEl) statusEl.textContent = '현재 장면을 캡처하는 중입니다...';
+
+      try {
+        const videoWidth = videoEl.videoWidth;
+        const videoHeight = videoEl.videoHeight;
+        const scale = Math.min(1280 / videoWidth, 720 / videoHeight, 1);
+        const targetWidth = Math.max(1, Math.round(videoWidth * scale));
+        const targetHeight = Math.max(1, Math.round(videoHeight * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          if (statusEl) statusEl.textContent = '이 브라우저에서는 장면 캡처를 사용할 수 없습니다.';
+          return;
+        }
+
+        ctx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
+
+        if (onhadaIsCanvasFrameNearBlack(canvas)) {
+          if (statusEl) statusEl.textContent = '캡처한 장면이 검은 화면입니다. 재생 위치를 옮긴 뒤 다시 캡처해 주세요.';
+          return;
+        }
+
+        const blob = await onhadaEncodeThumbnailBlob(canvas);
+
+        if (!blob) {
+          if (statusEl) statusEl.textContent = '썸네일 캡처에 실패했습니다. 다시 시도해 주세요.';
+          return;
+        }
+
+        if (onhadaManagerUnifiedThumbnailPreviewUrl) {
+          URL.revokeObjectURL(onhadaManagerUnifiedThumbnailPreviewUrl);
+          onhadaManagerUnifiedThumbnailPreviewUrl = null;
+        }
+
+        const previewUrl = URL.createObjectURL(blob);
+        onhadaManagerUnifiedThumbnailBlob = blob;
+        onhadaManagerUnifiedThumbnailPreviewUrl = previewUrl;
+
+        if (thumbnailPreviewEl) thumbnailPreviewEl.src = previewUrl;
+        if (thumbnailWrapEl) thumbnailWrapEl.style.display = 'block';
+        if (statusEl) statusEl.textContent = '썸네일이 캡처되었습니다.';
+      } finally {
+        onhadaManagerUnifiedThumbnailCapturing = false;
+        if (captureBtn) captureBtn.disabled = false;
+        if (recaptureBtn) recaptureBtn.disabled = false;
       }
     }
 
@@ -6505,6 +6795,23 @@
         }
         if (statusEl) statusEl.textContent = 'PDF 또는 JPG, PNG, WEBP 형식만 등록할 수 있습니다.';
         return false;
+      }
+
+      if (onhadaManagerUnifiedMediaType === 'video') {
+        if (file.type !== 'video/mp4') {
+          if (statusEl) statusEl.textContent = 'MP4 형식만 등록할 수 있습니다.';
+          return false;
+        }
+        if (file.size > 50 * 1024 * 1024) {
+          if (statusEl) statusEl.textContent = '영상 용량은 50MB를 초과할 수 없습니다.';
+          return false;
+        }
+        // 영상 작품은 썸네일이 없으면 등록할 수 없다.
+        if (!(onhadaManagerUnifiedThumbnailBlob instanceof Blob)) {
+          if (statusEl) statusEl.textContent = '먼저 장면을 캡처해 썸네일을 만들어 주세요.';
+          return false;
+        }
+        return true;
       }
 
       return false;
@@ -6628,7 +6935,22 @@
 
       const previewWrap = document.createElement('div');
       previewWrap.style.cssText = "margin-bottom:16px;";
-      if (onhadaManagerUnifiedPreviewUrl) {
+      if (onhadaManagerUnifiedMediaType === 'video') {
+        // 영상 자체(onhadaManagerUnifiedPreviewUrl)는 <img>로 그릴 수 없으므로
+        // 캡처된 썸네일 전용 미리보기 URL을 사용한다.
+        if (onhadaManagerUnifiedThumbnailPreviewUrl) {
+          const img = document.createElement('img');
+          img.src = onhadaManagerUnifiedThumbnailPreviewUrl;
+          img.alt = '캡처된 썸네일 미리보기';
+          img.style.cssText = "max-width:100%; border-radius:10px; display:block;";
+          previewWrap.appendChild(img);
+        } else {
+          const icon = document.createElement('div');
+          icon.style.cssText = "background: rgba(255,255,255,0.06); border-radius:10px; padding:30px; text-align:center; color:var(--text-gray); font-size:0.9rem;";
+          icon.textContent = '영상 작품';
+          previewWrap.appendChild(icon);
+        }
+      } else if (onhadaManagerUnifiedPreviewUrl) {
         const img = document.createElement('img');
         img.src = onhadaManagerUnifiedPreviewUrl;
         img.alt = '작품 미리보기';
@@ -6656,12 +6978,182 @@
         bodyEl.appendChild(wrap);
       }
 
-      addRow('작품 종류', onhadaManagerUnifiedMediaType === 'image' ? '이미지 작품' : '문서 작품');
+      const mediaTypeSummaryLabel = onhadaManagerUnifiedMediaType === 'image' ? '이미지 작품'
+        : onhadaManagerUnifiedMediaType === 'video' ? '영상 작품'
+        : '문서 작품';
+      addRow('작품 종류', mediaTypeSummaryLabel);
       addRow('작품명', title);
       addRow('작가명 또는 별명', author);
       addRow('카테고리', categoryName);
       addRow('작품 소개', description);
       addRow('전시 동의', consentEl && consentEl.checked ? '동의 완료' : '미확인');
+    }
+
+    // 보상 삭제 전용 헬퍼 - 성공 여부(boolean)만 반환하고 예외를 밖으로
+    // 던지지 않는다. 경로 문자열은 이 함수 안에서만 쓰고 절대 반환/노출하지 않는다.
+    async function onhadaManagerUnifiedRemoveVideoSilently(path) {
+      try {
+        const result = await window.ONHADA_BACKEND.storage.removeManagedArtworkVideo(path);
+        return !!(result && result.ok);
+      } catch (err) {
+        return false;
+      }
+    }
+
+    async function onhadaManagerUnifiedRemoveThumbnailSilently(path) {
+      try {
+        const result = await window.ONHADA_BACKEND.storage.removeManagedArtworkAsset(path);
+        return !!(result && result.ok);
+      } catch (err) {
+        return false;
+      }
+    }
+
+    // 영상 작품 전용 제출 오케스트레이션. onhadaManagerUnifiedSubmit()이
+    // mediaType==='video'일 때만 호출한다. 순서: 영상 업로드 → 썸네일
+    // 업로드(기존 uploadManagedArtworkImage 재사용) → artworks 행 등록.
+    // 실패 지점마다 정확히 그 시점까지 올라간 파일만 보상 삭제한다.
+    // 삭제 실패가 나더라도 원래 등록 오류 문구를 덮어쓰지 않고 뒤에 이어붙인다.
+    async function onhadaManagerUnifiedSubmitVideoArtwork(processingExhibitionId, requestToken, videoFile, title, author, categoryId, description, statusEl) {
+      const thumbnailBlob = onhadaManagerUnifiedThumbnailBlob;
+
+      // 2. 썸네일 존재 확인(onhadaManagerUnifiedValidateStep2에서 이미 확인했지만
+      // 제출 시점에도 한 번 더 방어적으로 확인한다).
+      if (!(thumbnailBlob instanceof Blob)) {
+        if (statusEl) statusEl.textContent = '먼저 장면을 캡처해 썸네일을 만들어 주세요.';
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = '영상을 업로드하는 중입니다...';
+
+      // 3. 영상 업로드
+      let videoUploadResult;
+      try {
+        videoUploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkVideo(processingExhibitionId, videoFile);
+      } catch (err) {
+        videoUploadResult = { ok: false, path: null, error: { code: 'unexpected_error', message: '영상 업로드 중 오류가 발생했습니다.' } };
+      }
+
+      if (!videoUploadResult.ok) {
+        if (requestToken !== onhadaManagerUnifiedRequestToken) return;
+        if (statusEl) statusEl.textContent = (videoUploadResult.error && videoUploadResult.error.message) || '영상 업로드에 실패했습니다.';
+        return;
+      }
+
+      const videoPath = videoUploadResult.path;
+
+      if (requestToken !== onhadaManagerUnifiedRequestToken || currentManagedExhibitionId !== processingExhibitionId) {
+        await onhadaManagerUnifiedRemoveVideoSilently(videoPath);
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = '썸네일을 업로드하는 중입니다...';
+
+      // 4. 썸네일 업로드 - 기존 이미지 업로드 서비스(재인코딩/EXIF 제거 포함)를
+      // 그대로 재사용한다. 캡처된 Blob을 File로만 감싼다(원본 파일명 없음).
+      const thumbnailExt = thumbnailBlob.type === 'image/webp' ? 'webp' : 'jpg';
+      const thumbnailFile = new File([thumbnailBlob], 'thumbnail.' + thumbnailExt, { type: thumbnailBlob.type });
+
+      let thumbnailUploadResult;
+      try {
+        thumbnailUploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkImage(processingExhibitionId, thumbnailFile);
+      } catch (err) {
+        thumbnailUploadResult = { ok: false, path: null, error: { code: 'unexpected_error', message: '썸네일 업로드 중 오류가 발생했습니다.' } };
+      }
+
+      if (!thumbnailUploadResult.ok) {
+        // 영상 업로드 성공 후 썸네일 업로드 실패 - 영상을 삭제한다.
+        const videoCleanupOk = await onhadaManagerUnifiedRemoveVideoSilently(videoPath);
+        if (requestToken !== onhadaManagerUnifiedRequestToken) return;
+        if (statusEl) {
+          const baseMsg = (thumbnailUploadResult.error && thumbnailUploadResult.error.message) || '썸네일 업로드에 실패했습니다.';
+          statusEl.textContent = videoCleanupOk
+            ? baseMsg
+            : baseMsg + ' 업로드된 영상 정리에도 실패했습니다. 다시 제출하지 말고 관리자에게 문의해 주세요.';
+        }
+        return;
+      }
+
+      const thumbnailPath = thumbnailUploadResult.path;
+
+      if (requestToken !== onhadaManagerUnifiedRequestToken || currentManagedExhibitionId !== processingExhibitionId) {
+        await onhadaManagerUnifiedRemoveVideoSilently(videoPath);
+        await onhadaManagerUnifiedRemoveThumbnailSilently(thumbnailPath);
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = '작품 정보를 승인 대기 상태로 저장하는 중입니다.';
+
+      // 5. artworks 행 등록
+      const dbInput = {
+        media_type: 'video',
+        title: title,
+        artist_display_name: author,
+        category_id: categoryId,
+        description: description,
+        consent_confirmed: true,
+        media_path: videoPath,
+        thumbnail_path: thumbnailPath
+      };
+
+      let dbResult;
+      try {
+        dbResult = await window.ONHADA_BACKEND.db.createManagedUnifiedArtwork(processingExhibitionId, dbInput);
+      } catch (err) {
+        dbResult = { ok: false, artwork: null, error: { code: 'unexpected_error', message: '작품 저장 중 오류가 발생했습니다.' } };
+      }
+
+      if (requestToken !== onhadaManagerUnifiedRequestToken) {
+        await onhadaManagerUnifiedRemoveVideoSilently(videoPath);
+        await onhadaManagerUnifiedRemoveThumbnailSilently(thumbnailPath);
+        return;
+      }
+
+      if (dbResult.ok) {
+        if (currentManagedExhibitionId === processingExhibitionId) {
+          // 6. 성공 시 폼과 로컬 미리보기 리소스 초기화
+          onhadaResetManagerUnifiedState();
+          onhadaRenderManagerUnifiedStep();
+          const freshStatusEl = document.getElementById('onhada-manager-unified-status');
+          if (freshStatusEl) freshStatusEl.textContent = '작품이 승인 대기 상태로 등록되었습니다.';
+          renderManagedArtworks(processingExhibitionId);
+        }
+        return;
+      }
+
+      // 영상·썸네일 성공 후 DB 등록 실패 - 영상과 썸네일 모두 삭제한다.
+      const videoCleanupOk = await onhadaManagerUnifiedRemoveVideoSilently(videoPath);
+      const thumbnailCleanupOk = await onhadaManagerUnifiedRemoveThumbnailSilently(thumbnailPath);
+
+      if (currentManagedExhibitionId === processingExhibitionId) {
+        const baseMsg = (dbResult.error && dbResult.error.message) || '작품 저장에 실패했습니다.';
+        const freshStatusEl = document.getElementById('onhada-manager-unified-status');
+
+        if (videoCleanupOk && thumbnailCleanupOk) {
+          // 파일만 정리하고 나머지 입력(제목/작가/카테고리/설명/동의)은 유지한다.
+          // 영상과 썸네일은 새로 선택·캡처해야 하므로 함께 초기화한다(공용
+          // 헬퍼가 object URL revoke·상태 null화·미리보기 영역 비우기를
+          // 전부 담당하고, 여기서는 파일 입력 값만 별도로 지운다 - change
+          // 이벤트 처리 중이 아니므로 지워도 안전하다).
+          onhadaManagerUnifiedClearSelectedFileState();
+          const fileVideoEl = document.getElementById('onhada-manager-unified-file-video');
+          if (fileVideoEl) fileVideoEl.value = "";
+          onhadaManagerUnifiedStep = 2;
+          onhadaRenderManagerUnifiedStep();
+          if (freshStatusEl) {
+            freshStatusEl.textContent = baseMsg + ' 입력하신 내용은 유지되었습니다. 영상을 다시 선택하고 썸네일을 다시 캡처해 등록해 주세요.';
+          }
+        } else {
+          // 삭제 실패는 원래 등록 오류를 덮어쓰지 않고 별도로 이어붙여 기록한다.
+          // 실제 Storage 경로는 노출하지 않고 정리 성공/실패 여부만 표시한다.
+          if (statusEl) {
+            statusEl.textContent = baseMsg
+              + ' 업로드된 파일 정리에도 실패했습니다(영상: ' + (videoCleanupOk ? '정리됨' : '정리 실패')
+              + ', 썸네일: ' + (thumbnailCleanupOk ? '정리됨' : '정리 실패')
+              + '). 다시 제출하지 말고 관리자에게 문의해 주세요.';
+          }
+        }
+      }
     }
 
     // 제출 오케스트레이션. 더블클릭 방지는 onhadaManagerUnifiedSubmitting
@@ -6695,6 +7187,19 @@
       const author = document.getElementById('onhada-manager-unified-author').value.trim();
       const categoryId = document.getElementById('onhada-manager-unified-category').value;
       const description = document.getElementById('onhada-manager-unified-description').value.trim();
+
+      if (mediaType === 'video') {
+        try {
+          await onhadaManagerUnifiedSubmitVideoArtwork(processingExhibitionId, requestToken, file, title, author, categoryId, description, statusEl);
+        } finally {
+          onhadaManagerUnifiedSubmitting = false;
+          const finalPrevBtn = document.getElementById('onhada-manager-unified-prev-btn');
+          const finalNextBtn = document.getElementById('onhada-manager-unified-next-btn');
+          if (finalPrevBtn) finalPrevBtn.disabled = false;
+          if (finalNextBtn) finalNextBtn.disabled = false;
+        }
+        return;
+      }
 
       const isPdf = mediaType === 'document' && file.type === 'application/pdf';
 
@@ -6812,10 +7317,11 @@
     }
 
     // 경로 배열을 받아 중복 제거 + null/빈 값 제외 + 제외 목록(현재도 쓰이는
-    // 경로) 제외 후, 확장자 기준으로 removeManagedArtworkDocument(.pdf) 또는
-    // removeManagedArtworkAsset(그 외)을 호출한다. update/delete 보상 정리에서
-    // 공통으로 재사용한다. 경로 문자열은 이 함수 밖으로 절대 반환하지 않고,
-    // console/DOM에도 출력하지 않는다 - 성공 여부(boolean)만 돌려준다.
+    // 경로) 제외 후, 확장자 기준으로 removeManagedArtworkDocument(.pdf) /
+    // removeManagedArtworkVideo(.mp4) / removeManagedArtworkAsset(그 외)을
+    // 호출한다. update/delete 보상 정리에서 공통으로 재사용한다. 경로
+    // 문자열은 이 함수 밖으로 절대 반환하지 않고, console/DOM에도 출력하지
+    // 않는다 - 성공 여부(boolean)만 돌려준다.
     async function onhadaManagerUnifiedCleanupPaths(pathsToConsider, pathsToExclude) {
       const excludeSet = new Set(
         (pathsToExclude || []).filter(function (p) { return typeof p === 'string' && p.length > 0; })
@@ -6833,6 +7339,8 @@
           let result;
           if (/\.pdf$/i.test(path)) {
             result = await window.ONHADA_BACKEND.storage.removeManagedArtworkDocument(path);
+          } else if (/\.mp4$/i.test(path)) {
+            result = await window.ONHADA_BACKEND.storage.removeManagedArtworkVideo(path);
           } else {
             result = await window.ONHADA_BACKEND.storage.removeManagedArtworkAsset(path);
           }

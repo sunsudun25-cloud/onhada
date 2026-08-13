@@ -512,6 +512,35 @@
         return true;
     }
 
+    // 영상(MP4) 전용 비공개 path validator. isValidManagedImagePath()/
+    // isValidManagedDocumentPdfPath()는 건드리지 않고 완전히 별도로 둔다.
+    // 폴더 구간(UUID) 검증 정규식은 동일하게 MANAGED_IMAGE_PATH_UUID_RE를
+    // 재사용하되, 파일명 확장자만 .mp4로 한정한다.
+    var MANAGED_VIDEO_PATH_FILE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.mp4$/i;
+
+    function isValidManagedVideoPath(mediaPath, exhibitionId) {
+        if (typeof mediaPath !== 'string' || mediaPath.length === 0) return false;
+        if (mediaPath.indexOf('://') !== -1) return false;
+        if (mediaPath.charAt(0) === '/') return false;
+        if (mediaPath.indexOf('\\') !== -1) return false;
+        if (mediaPath.indexOf(' ') !== -1) return false;
+        if (mediaPath.indexOf('?') !== -1) return false;
+        if (mediaPath.indexOf('#') !== -1) return false;
+        if (mediaPath.indexOf('..') !== -1) return false;
+
+        var segments = mediaPath.split('/');
+        if (segments.length !== 2) return false;
+
+        var exhibitionSegment = segments[0];
+        var fileSegment = segments[1];
+
+        if (exhibitionSegment !== exhibitionId) return false;
+        if (!MANAGED_IMAGE_PATH_UUID_RE.test(exhibitionSegment)) return false;
+        if (!MANAGED_VIDEO_PATH_FILE_RE.test(fileSegment)) return false;
+
+        return true;
+    }
+
     // 이 함수는 storage-service.js를 직접 호출하지 않는다. 이미지 업로드는
     // 이 함수 호출 이전에 이미 완료되어 media_path로 전달되어야 하며,
     // 이 INSERT가 실패했을 때 방금 올린 Storage 파일을 보상 삭제하는 책임은
@@ -626,15 +655,14 @@
         }
     }
 
-    // 통합 작품 등록 - image/document 공용. 이번 1차 구현에서는 video를
-    // unsupported_media_type으로 차단한다(MP4 Storage/썸네일 캡처 구현 후
-    // 별도 확장 예정). 기존 createManagedArtwork(text)/createManagedImageArtwork는
-    // 기존 데이터·화면 호환용으로 그대로 두고 이 함수에서 대체하지 않는다.
+    // 통합 작품 등록 - image/document/video 공용. 기존 createManagedArtwork(text)/
+    // createManagedImageArtwork는 기존 데이터·화면 호환용으로 그대로 두고 이
+    // 함수에서 대체하지 않는다.
     //
     // 이 함수도 storage-service.js를 직접 호출하지 않는다. 파일 업로드는 이
-    // 함수 호출 이전에 이미 완료되어 media_path로 전달되어야 하며, 이 INSERT가
-    // 실패했을 때 방금 올린 Storage 파일을 보상 삭제하는 책임은 이 함수가
-    // 아니라 호출자(제출 오케스트레이터)가 진다.
+    // 함수 호출 이전에 이미 완료되어 media_path(영상은 thumbnail_path도 함께)로
+    // 전달되어야 하며, 이 INSERT가 실패했을 때 방금 올린 Storage 파일을 보상
+    // 삭제하는 책임은 이 함수가 아니라 호출자(제출 오케스트레이터)가 진다.
     async function createManagedUnifiedArtwork(exhibitionId, input) {
         const client = getClient();
         if (!client) {
@@ -659,10 +687,12 @@
         const descriptionTrimmed = typeof input.description === 'string' ? input.description.trim() : '';
         const consentConfirmed = input.consent_confirmed === true;
         const mediaPath = typeof input.media_path === 'string' ? input.media_path : '';
+        // video 전용 - image/document는 이 필드를 아예 보내지 않는다(무시됨).
+        const thumbnailPath = typeof input.thumbnail_path === 'string' ? input.thumbnail_path : '';
 
-        // 3. media_type이 image 또는 document인지 (video/text/audio/mixed는 차단)
-        if (['image', 'document'].indexOf(mediaType) === -1) {
-            return { ok: false, artwork: null, error: safeError('unsupported_media_type', '이미지 또는 문서 형식만 등록할 수 있습니다.') };
+        // 3. media_type이 image/document/video인지 (text/audio/mixed는 차단)
+        if (['image', 'document', 'video'].indexOf(mediaType) === -1) {
+            return { ok: false, artwork: null, error: safeError('unsupported_media_type', '이미지, 문서 또는 영상 형식만 등록할 수 있습니다.') };
         }
 
         // 4. 작품명
@@ -741,22 +771,40 @@
         // 14. media_path가 exhibitionId 폴더와 정확히 일치하는지 + media_type별 규칙
         //     image   : 기존 이미지 path(jpg/png/webp)만 허용, pdf 경로는 거부
         //     document: PDF path 또는 기존 이미지 path 모두 허용
+        //     video   : media_path는 반드시 .mp4, thumbnail_path는 반드시 이미지
+        //               path이며 media_path와 서로 달라야 한다(둘 다 필수).
         const isImagePath = isValidManagedImagePath(mediaPath, exhibitionId);
         const isPdfPath = isValidManagedDocumentPdfPath(mediaPath, exhibitionId);
+
+        let thumbnailUrlForPayload = null;
 
         if (mediaType === 'image') {
             if (!isImagePath) {
                 return { ok: false, artwork: null, error: safeError('invalid_media_path', '이미지 경로 정보가 올바르지 않습니다.') };
             }
-        } else {
-            // mediaType === 'document'
+            thumbnailUrlForPayload = mediaPath;
+        } else if (mediaType === 'document') {
             if (!isImagePath && !isPdfPath) {
                 return { ok: false, artwork: null, error: safeError('invalid_media_path', '문서 경로 정보가 올바르지 않습니다.') };
             }
+            thumbnailUrlForPayload = isImagePath ? mediaPath : null;
+        } else {
+            // mediaType === 'video'
+            const isVideoPath = isValidManagedVideoPath(mediaPath, exhibitionId);
+            const isThumbnailImagePath = isValidManagedImagePath(thumbnailPath, exhibitionId);
+
+            if (!isVideoPath) {
+                return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상 경로 정보가 올바르지 않습니다.') };
+            }
+            if (!isThumbnailImagePath) {
+                return { ok: false, artwork: null, error: safeError('invalid_thumbnail_path', '썸네일 경로 정보가 올바르지 않습니다.') };
+            }
+            if (mediaPath === thumbnailPath) {
+                return { ok: false, artwork: null, error: safeError('invalid_media_path', '영상과 썸네일 경로는 서로 달라야 합니다.') };
+            }
+            thumbnailUrlForPayload = thumbnailPath;
         }
 
-        // thumbnail_url : image 경로(이미지형 image/document 공통)는 media_path와
-        // 동일하게, PDF 경로(document 전용)는 null로 둔다(1차 버전).
         const payload = {
             exhibition_id: exhibitionId,
             category_id: categoryId,
@@ -764,7 +812,7 @@
             media_type: mediaType,
             artist_display_name: artistDisplayName,
             description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
-            thumbnail_url: isImagePath ? mediaPath : null,
+            thumbnail_url: thumbnailUrlForPayload,
             media_url: mediaPath,
             external_url: null,
             status: 'pending',
