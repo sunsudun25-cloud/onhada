@@ -622,9 +622,10 @@
 
     // =====================================================================
     // MP4 영상(artwork-video-assets 버킷) 전용 - 위 이미지/PDF 관련 상수/검증
-    // 함수와는 완전히 분리해서 둔다. 공개 관람객용 재생 화면은 이번 단계
-    // 범위 밖이므로 downloadArtworkVideo()는 만들지 않는다(운영자는 브라우저가
-    // 로컬로 선택한 File을 그대로 미리보기하므로 다운로드가 필요 없다).
+    // 함수와는 완전히 분리해서 둔다. 관리자 위저드는 브라우저가 로컬로
+    // 선택한 File을 그대로 미리보기하므로 업로드 전 다운로드가 필요 없지만,
+    // 공개 상세보기 모달은 이미 업로드된 직접 업로드 영상을 재생하기 위해
+    // downloadArtworkVideo()로 Blob을 받아야 한다.
     // =====================================================================
 
     var VIDEO_MAX_FILE_SIZE = 50 * 1024 * 1024; // 52428800, artwork-video-assets 버킷 설정과 동일
@@ -802,6 +803,47 @@
         }
     }
 
+    // 공개 관람객용 직접 업로드 영상 다운로드. downloadArtworkAsset/
+    // downloadArtworkDocument와 동일하게 role 사전 확인을 하지 않는다.
+    // admin/manager/anon 모두 호출할 수 있으며, 실제로 그 경로를 읽을 권한이
+    // 있는지는 storage.objects RLS(storage_artwork_video_assets_select_*)가
+    // 최종 판단한다. removeManagedArtworkVideo()와 동일한 isValidVideoPath()를
+    // 그대로 재사용해 경로를 검증한다. public URL이나 signed URL은 생성하지
+    // 않고, 항상 download()로 받은 Blob만 반환한다. object URL 생성/정리는
+    // 이 서비스가 하지 않고 호출한 UI가 필요할 때 만들고 정리한다.
+    async function downloadArtworkVideo(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, blob: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidVideoPath(path)) {
+            return { ok: false, blob: null, error: safeError('invalid_storage_path', '영상 경로 정보가 올바르지 않습니다.') };
+        }
+
+        try {
+            var downloadResult = await client.storage.from('artwork-video-assets').download(path);
+
+            if (downloadResult.error || !downloadResult.data) {
+                return { ok: false, blob: null, error: safeError('download_failed', '영상을 불러오지 못했습니다.') };
+            }
+
+            var blob = downloadResult.data;
+
+            if (blob.type !== VIDEO_MIME_TYPE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_video', '영상 형식이 올바르지 않습니다.') };
+            }
+
+            if (!(blob.size > 0) || blob.size > VIDEO_MAX_FILE_SIZE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_video', '영상 용량이 올바르지 않습니다.') };
+            }
+
+            return { ok: true, blob: blob, mimeType: blob.type, size: blob.size, error: null };
+        } catch (err) {
+            return { ok: false, blob: null, error: safeError('download_failed', '영상 다운로드 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.storage = {
         uploadManagedArtworkImage: uploadManagedArtworkImage,
         removeManagedArtworkAsset: removeManagedArtworkAsset,
@@ -810,6 +852,7 @@
         removeManagedArtworkDocument: removeManagedArtworkDocument,
         downloadArtworkDocument: downloadArtworkDocument,
         uploadManagedArtworkVideo: uploadManagedArtworkVideo,
-        removeManagedArtworkVideo: removeManagedArtworkVideo
+        removeManagedArtworkVideo: removeManagedArtworkVideo,
+        downloadArtworkVideo: downloadArtworkVideo
     };
 })();

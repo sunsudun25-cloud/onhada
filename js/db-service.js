@@ -300,6 +300,7 @@
                     category_id,
                     thumbnail_url,
                     media_url,
+                    external_url,
                     description,
                     poem,
                     categories (
@@ -333,6 +334,7 @@
                     category_id: row.category_id,
                     thumbnail_url: row.thumbnail_url,
                     media_url: row.media_url,
+                    external_url: row.external_url,
                     description: row.description,
                     poem: row.poem,
                     categories: row.categories

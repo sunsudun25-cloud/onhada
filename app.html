@@ -3654,10 +3654,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260811-5"></script>
-  <script src="js/auth-service.js?v=20260811-5"></script>
-  <script src="js/db-service.js?v=20260811-5"></script>
-  <script src="js/storage-service.js?v=20260811-5"></script>
+  <script src="js/supabase-client.js?v=20260811-6"></script>
+  <script src="js/auth-service.js?v=20260811-6"></script>
+  <script src="js/db-service.js?v=20260811-6"></script>
+  <script src="js/storage-service.js?v=20260811-6"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4659,9 +4659,12 @@
         galleryGrid.appendChild(item);
 
         // media_type='text' 등 이미지가 아닌 작품은 Storage 다운로드를
-        // 전혀 시도하지 않는다.
+        // 전혀 시도하지 않는다. video는 카드에서 영상 자체를 절대 받지
+        // 않고 thumbnail_url 이미지만 받는다(재생은 상세보기 모달 전용).
         if (art.media_type === 'image') {
           onhadaLoadPublicArtworkImage(art, requestSeq, exhibitionId, imgWrapper);
+        } else if (art.media_type === 'video') {
+          onhadaLoadPublicArtworkVideoCardThumbnail(art, requestSeq, exhibitionId, imgWrapper);
         }
       });
     }
@@ -4718,6 +4721,72 @@
       errMsg.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.85rem; padding: 20px 0;";
       errMsg.textContent = "이미지를 불러올 수 없습니다.";
       containerEl.appendChild(errMsg);
+    }
+
+    // 영상 작품 카드 배지(재생 아이콘). 썸네일 로드 성공 여부와 무관하게
+    // 항상 표시해, 카드만 보고도 영상 작품임을 알 수 있게 한다.
+    // .img-wrapper는 이미 position:relative이므로 별도 지정 없이 바로
+    // 절대 위치로 겹칠 수 있다.
+    function onhadaRenderPublicArtworkVideoBadge(containerEl) {
+      const badge = document.createElement('div');
+      badge.setAttribute('aria-hidden', 'true');
+      badge.style.cssText = "position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.65); color:#fff; border-radius:12px; padding:3px 10px; font-size:0.75rem; z-index:1;";
+      badge.textContent = "▶ 영상";
+      containerEl.appendChild(badge);
+    }
+
+    // 카드용 안전한 영상 기본 표시(썸네일이 없거나 다운로드 실패). 깨진
+    // 이미지 아이콘 대신 어두운 배경만 남기고, 위 배지가 영상 작품임을 알려준다.
+    function onhadaShowPublicVideoCardFallback(containerEl) {
+      if (!containerEl) return;
+      containerEl.style.minHeight = "180px";
+      containerEl.style.background = "#111";
+    }
+
+    // 영상 작품 카드 전용 썸네일 로딩. 카드를 렌더링할 때 영상 자체는
+    // 절대 다운로드하지 않고 thumbnail_url(artwork-assets 버킷 이미지)만
+    // 받는다 - media_url/external_url은 카드 단계에서 전혀 참조하지 않는다.
+    // 재생은 상세보기 모달에서 재생 버튼을 눌러야만 시작된다.
+    async function onhadaLoadPublicArtworkVideoCardThumbnail(art, requestSeq, exhibitionId, containerEl) {
+      onhadaRenderPublicArtworkVideoBadge(containerEl);
+
+      const path = art.thumbnail_url;
+      if (!path) {
+        onhadaShowPublicVideoCardFallback(containerEl);
+        return;
+      }
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (!result.ok || !result.blob) {
+        if (requestSeq === onhadaPublicArtworksRequestSeq && activeSupabaseExhibitionId === exhibitionId) {
+          onhadaShowPublicVideoCardFallback(containerEl);
+        }
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      // stale 가드: 다운로드가 끝난 시점에 이미 다른 전시관으로 이동했거나
+      // 새 조회가 시작됐다면, 방금 만든 object URL을 즉시 revoke하고
+      // 화면에는 넣지 않는다.
+      if (requestSeq !== onhadaPublicArtworksRequestSeq || activeSupabaseExhibitionId !== exhibitionId) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      onhadaPublicArtworkBlobUrls.set(art.id, objectUrl);
+
+      const img = document.createElement('img');
+      img.src = objectUrl;
+      img.alt = (art.title || '작품') + ' 영상 썸네일';
+      img.loading = 'lazy';
+      containerEl.appendChild(img);
     }
 
     // =========================================================================
@@ -4941,8 +5010,11 @@
     }
 
     // media_type에 맞는 상세 본문을 분기한다. text는 Storage 다운로드를
-    // 전혀 호출하지 않는다. video/audio/mixed 및 그 외 값은 현재 공개
-    // 조회·Storage 지원 범위 밖이므로 임의 URL을 열지 않고 안내 문구만 표시한다.
+    // 전혀 호출하지 않는다. video는 직접 업로드(media_url)/외부 링크
+    // (external_url) 두 방식 모두 재생 버튼을 눌러야만 실제 로딩을
+    // 시작한다(onhadaLoadPublicArtworkDetailVideo 참고). audio/mixed 및
+    // 그 외 값은 현재 공개 조회·Storage 지원 범위 밖이므로 임의 URL을
+    // 열지 않고 안내 문구만 표시한다.
     function onhadaLoadPublicArtworkDetailMedia(art, requestSeq, containerEl) {
       if (!containerEl) return;
 
@@ -4961,6 +5033,11 @@
         return;
       }
 
+      if (art.media_type === 'video') {
+        onhadaLoadPublicArtworkDetailVideo(art, requestSeq, containerEl);
+        return;
+      }
+
       if (art.media_type === 'text') {
         const bodyEl = document.createElement('p');
         bodyEl.style.cssText = "white-space:pre-wrap; color:#ddd; font-size:0.95rem; line-height:1.7; padding: 10px 0;";
@@ -4973,6 +5050,220 @@
       noticeEl.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.9rem; padding: 40px 0;";
       noticeEl.textContent = "현재 상세 재생을 준비 중입니다.";
       containerEl.appendChild(noticeEl);
+    }
+
+    // =========================================================================
+    // 공개 상세보기 모달 - 영상 작품(media_type='video') 재생 전용. 직접
+    // 업로드(media_url)/외부 HTTPS MP4 링크(external_url) 두 방식을 모두
+    // 지원한다. 초기 상태는 항상 썸네일 + 중앙 재생 버튼만 보여주고, 카드와
+    // 마찬가지로 실제 영상은 재생 버튼을 눌러야만 요청한다. 직접 업로드는
+    // downloadArtworkVideo()로 받은 Blob을 <video src>에 연결하고, 외부
+    // 링크는 DB에서 읽은 external_url을 신뢰하지 않고 onhadaValidateExternalVideoUrl()
+    // (2단계에서 만든 것과 동일한 함수)로 재생 직전 다시 검증한 뒤 그
+    // 정규화된 URL만 <video src>에 직접 대입한다(iframe 사용 금지,
+    // innerHTML 삽입 금지). 두 방식 모두 자동재생하지 않는다.
+    // =========================================================================
+
+    // 상세모달 media 컨테이너 안에 재생 중이던 <video>가 있으면 안전하게
+    // 정리한다(pause → src 제거 → load() 호출). 이미지/PDF/텍스트에는
+    // video 요소가 없으므로 querySelector가 null이면 아무 일도 하지
+    // 않는다(멱등 - 여러 번 호출해도 안전).
+    function onhadaCleanupPublicArtworkDetailVideoElement() {
+      const mediaEl = document.getElementById('onhada-public-artwork-detail-media');
+      if (!mediaEl) return;
+      const videoEl = mediaEl.querySelector('video');
+      if (!videoEl) return;
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    }
+
+    async function onhadaLoadPublicArtworkDetailVideo(art, requestSeq, containerEl) {
+      containerEl.innerHTML = "";
+
+      const wrap = document.createElement('div');
+      wrap.style.cssText = "position:relative; max-width:100%; min-height:200px; border-radius:12px; overflow:hidden; background:#111; display:flex; align-items:center; justify-content:center;";
+
+      const thumbImg = document.createElement('img');
+      thumbImg.alt = (art.title || '작품') + ' 영상 썸네일';
+      thumbImg.style.cssText = "width:100%; max-height:65vh; display:block; object-fit:contain;";
+      wrap.appendChild(thumbImg);
+
+      const playBtn = document.createElement('button');
+      playBtn.type = 'button';
+      playBtn.setAttribute('aria-label', (art.title || '작품') + ' 영상 재생');
+      playBtn.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:64px; height:64px; border-radius:50%; background:rgba(0,0,0,0.65); color:#fff; font-size:1.6rem; border:2px solid rgba(255,255,255,0.85); cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;";
+      playBtn.textContent = "▶";
+      wrap.appendChild(playBtn);
+
+      containerEl.appendChild(wrap);
+
+      const statusMsg = document.createElement('p');
+      statusMsg.setAttribute('aria-live', 'polite');
+      statusMsg.style.cssText = "text-align:center; color:var(--text-gray); font-size:0.85rem; margin-top:10px;";
+      statusMsg.textContent = "영상 불러오기 버튼을 눌러 재생하세요.";
+      containerEl.appendChild(statusMsg);
+
+      playBtn.addEventListener('click', function () {
+        onhadaPlayPublicArtworkDetailVideo(art, requestSeq, wrap, playBtn, statusMsg);
+      });
+
+      const thumbPath = art.thumbnail_url;
+      if (!thumbPath) {
+        thumbImg.remove();
+        return;
+      }
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(thumbPath);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) return;
+
+      if (!result.ok || !result.blob) {
+        thumbImg.remove();
+        return;
+      }
+
+      const thumbUrl = URL.createObjectURL(result.blob);
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) {
+        URL.revokeObjectURL(thumbUrl);
+        return;
+      }
+
+      onhadaPublicArtworkDetailBlobUrls.set(art.id, thumbUrl);
+      thumbImg.src = thumbUrl;
+    }
+
+    // 재생 버튼 클릭 핸들러. 중복 클릭은 onhadaPublicArtworkDetailVideoLoading으로
+    // 막고, 시도가 끝나면(성공/실패/stale 무관) try/finally로 항상 잠금을
+    // 풀어 다음 클릭(예: 실패 후 재시도)이 막히지 않게 한다.
+    async function onhadaPlayPublicArtworkDetailVideo(art, requestSeq, wrapEl, playBtnEl, statusMsgEl) {
+      if (onhadaPublicArtworkDetailVideoLoading) return;
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) return;
+
+      onhadaPublicArtworkDetailVideoLoading = true;
+      if (playBtnEl) playBtnEl.disabled = true;
+      if (statusMsgEl) statusMsgEl.textContent = "영상을 불러오는 중입니다...";
+
+      try {
+        if (art.media_url) {
+          await onhadaPlayPublicArtworkDetailDirectVideo(art, requestSeq, wrapEl, playBtnEl, statusMsgEl);
+        } else if (art.external_url) {
+          onhadaPlayPublicArtworkDetailExternalVideo(art, requestSeq, wrapEl, playBtnEl, statusMsgEl);
+        } else {
+          if (playBtnEl) playBtnEl.disabled = false;
+          if (statusMsgEl) statusMsgEl.textContent = "영상을 불러올 수 없습니다.";
+        }
+      } finally {
+        onhadaPublicArtworkDetailVideoLoading = false;
+      }
+    }
+
+    // 직접 업로드 영상 재생. downloadArtworkVideo()가 내부 경로 형식·MIME·
+    // 빈 파일·50MB 초과를 전부 다시 검증한 뒤 Blob만 반환한다(RLS가 최종
+    // 방어선). 재생은 사용자의 재생 버튼 클릭에서 이어지는 동작이므로
+    // play()를 시도하되, 실패해도(브라우저 정책 등) 조용히 무시하고 이미
+    // 보이는 컨트롤로 재생할 수 있게 둔다.
+    async function onhadaPlayPublicArtworkDetailDirectVideo(art, requestSeq, wrapEl, playBtnEl, statusMsgEl) {
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkVideo(art.media_url);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) return;
+
+      if (!result.ok || !result.blob) {
+        if (playBtnEl) playBtnEl.disabled = false;
+        if (statusMsgEl) statusMsgEl.textContent = "영상을 불러올 수 없습니다.";
+        return;
+      }
+
+      const videoObjectUrl = URL.createObjectURL(result.blob);
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) {
+        URL.revokeObjectURL(videoObjectUrl);
+        return;
+      }
+
+      // 지금까지 이 art.id로 표시 중이던 썸네일 object URL(있다면)을 명시적으로
+      // revoke하고 같은 키를 영상 object URL로 교체한다(Map에 art.id당
+      // 하나의 살아있는 URL만 유지하는 기존 불변식을 그대로 따른다).
+      const prevUrl = onhadaPublicArtworkDetailBlobUrls.get(art.id);
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      onhadaPublicArtworkDetailBlobUrls.set(art.id, videoObjectUrl);
+
+      const videoEl = onhadaRenderPublicArtworkDetailVideoElement(wrapEl, videoObjectUrl, art.title, statusMsgEl);
+      videoEl.play().catch(function () {});
+    }
+
+    // 외부 링크 영상 재생. DB에서 읽은 external_url을 신뢰하지 않고
+    // onhadaValidateExternalVideoUrl()(2단계와 동일한 검증)로 재생 직전
+    // 다시 검증한다. 정규화된 URL만 <video src>에 대입하고, 자동재생하지
+    // 않는다(사용자가 표시된 기본 컨트롤로 직접 재생).
+    function onhadaPlayPublicArtworkDetailExternalVideo(art, requestSeq, wrapEl, playBtnEl, statusMsgEl) {
+      const check = onhadaValidateExternalVideoUrl(art.external_url);
+
+      if (!onhadaIsPublicArtworkDetailRequestCurrent(requestSeq, art.id)) return;
+
+      if (!check.ok) {
+        if (playBtnEl) playBtnEl.disabled = false;
+        if (statusMsgEl) statusMsgEl.textContent = "영상을 불러올 수 없습니다.";
+        return;
+      }
+
+      // 썸네일 object URL이 남아있다면(외부 링크는 Object URL을 만들지
+      // 않으므로 이 맵에 새로 넣지 않는다) 명시적으로 revoke하고 제거한다.
+      const prevUrl = onhadaPublicArtworkDetailBlobUrls.get(art.id);
+      if (prevUrl) {
+        URL.revokeObjectURL(prevUrl);
+        onhadaPublicArtworkDetailBlobUrls.delete(art.id);
+      }
+
+      onhadaRenderPublicArtworkDetailVideoElement(wrapEl, check.normalizedUrl, art.title, statusMsgEl);
+    }
+
+    // 직접 업로드(Blob object URL)/외부 링크(검증된 HTTPS URL) 공용 <video>
+    // 요소 생성. 둘 다 src 프로퍼티 대입만 사용하고(innerHTML 삽입 없음),
+    // iframe은 쓰지 않는다. controls/playsinline/preload="metadata"는
+    // 공통이며 자동재생은 이 함수 자체에서 하지 않는다(호출자가 필요할
+    // 때만 명시적으로 play()를 시도).
+    function onhadaRenderPublicArtworkDetailVideoElement(wrapEl, srcUrl, title, statusMsgEl) {
+      wrapEl.innerHTML = "";
+
+      const video = document.createElement('video');
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.setAttribute('aria-label', (title || '작품') + ' 영상');
+      video.style.cssText = "width:100%; max-height:65vh; display:block; margin:0 auto; border-radius:12px; background:#000;";
+
+      // 브라우저 기본 컨트롤에서 다운로드 버튼 노출을 줄이고 전시 감상
+      // 흐름을 유지하기 위한 것일 뿐, 원본 영상 복사를 막는 보안 장치가
+      // 아니다(브라우저별 지원 여부가 다르고, 네트워크 탭 등으로는 여전히
+      // 접근 가능하다). controlsList는 표준 DOM 프로퍼티가 아니라 속성으로만
+      // 설정 가능하다.
+      video.setAttribute('controlsList', 'nodownload');
+      video.disablePictureInPicture = true;
+
+      video.addEventListener('error', function () {
+        if (statusMsgEl) statusMsgEl.textContent = "영상을 불러올 수 없습니다.";
+      });
+
+      wrapEl.appendChild(video);
+
+      if (statusMsgEl) statusMsgEl.textContent = "";
+
+      video.src = srcUrl;
+      video.load();
+
+      return video;
     }
 
     // 현재 index의 작품 정보를 모달에 채운다. 열기/이전/다음 이동 시
@@ -5006,8 +5297,13 @@
 
       onhadaPublicArtworkDetailRequestSeq += 1;
       const requestSeq = onhadaPublicArtworkDetailRequestSeq;
-      // 상세 모달(iframe/이미지)이 소유한 blob만 정리한다. 이미 성공적으로
-      // 열린 "PDF 새 창" 전용 URL(onhadaPublicArtworkDetailPdfWindowResources)은
+      // 이전 작품이 영상이었다면 재생 중이던 <video>를 먼저 pause/src
+      // 제거/load()로 정리한 뒤 media 컨테이너를 비운다 - innerHTML="" 만으로는
+      // 브라우저가 진행 중인 미디어 파이프라인을 즉시 해제한다고 보장할 수 없다.
+      onhadaCleanupPublicArtworkDetailVideoElement();
+
+      // 상세 모달(iframe/이미지/영상)이 소유한 blob만 정리한다. 이미
+      // 성공적으로 열린 "PDF 새 창" 전용 URL(onhadaPublicArtworkDetailPdfWindowResources)은
       // 다른 작품으로 이동해도 절대 여기서 revoke하지 않는다 - 그 새 창은
       // 계속 열려 있어야 하기 때문이다(각자의 30초 타이머 또는 beforeunload가 정리).
       onhadaRevokePublicArtworkDetailBlobUrls();
@@ -5057,11 +5353,13 @@
       if (!onhadaPublicArtworkDetailOpen) return;
       onhadaPublicArtworkDetailOpen = false;
 
-      // 진행 중이던 상세 다운로드를 무효화하고, 상세 모달(iframe/이미지) 소유
-      // blob만 정리한다. 이미 성공적으로 열린 "PDF 새 창" 전용 URL은 모달을
-      // 닫아도 revoke하지 않는다 - 그 새 창은 계속 열려 있어야 하며, 정리는
-      // 각자의 30초 타이머 또는 beforeunload가 담당한다.
+      // 진행 중이던 상세 다운로드를 무효화하고, 재생 중이던 <video>가
+      // 있으면 먼저 pause/src 제거/load()로 정리한 뒤, 상세 모달(iframe/
+      // 이미지/영상) 소유 blob만 revoke한다. 이미 성공적으로 열린 "PDF 새 창"
+      // 전용 URL은 모달을 닫아도 revoke하지 않는다 - 그 새 창은 계속 열려
+      // 있어야 하며, 정리는 각자의 30초 타이머 또는 beforeunload가 담당한다.
       onhadaPublicArtworkDetailRequestSeq += 1;
+      onhadaCleanupPublicArtworkDetailVideoElement();
       onhadaRevokePublicArtworkDetailBlobUrls();
       onhadaPublicArtworkDetailIndex = -1;
 
@@ -5681,6 +5979,10 @@
     let onhadaPublicArtworkDetailRequestSeq = 0;
     let onhadaPublicArtworkDetailBlobUrls = new Map();
     let onhadaPublicArtworkDetailPreviousFocus = null;
+    // 영상 재생 버튼 중복 클릭 방지 전용 잠금. 다운로드/외부 링크 재검증
+    // 시도가 끝나면(성공/실패/stale 무관) try/finally로 항상 false로
+    // 되돌린다 - 재생 자체가 끝났는지와는 무관하게, "지금 로딩 중인지"만 막는다.
+    let onhadaPublicArtworkDetailVideoLoading = false;
 
     // PDF "새 창에서 보기" 전용 리소스. 상세 미리보기(iframe)용 blob URL과
     // 완전히 분리된 별도 object URL들을 담는다 - 모달을 닫거나 다른 작품으로
