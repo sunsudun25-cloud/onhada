@@ -301,6 +301,7 @@
                     thumbnail_url,
                     media_url,
                     external_url,
+                    share_token,
                     description,
                     poem,
                     categories (
@@ -335,6 +336,7 @@
                     thumbnail_url: row.thumbnail_url,
                     media_url: row.media_url,
                     external_url: row.external_url,
+                    share_token: row.share_token,
                     description: row.description,
                     poem: row.poem,
                     categories: row.categories
@@ -344,6 +346,94 @@
             return { ok: true, artworks: publicArtworks, error: null };
         } catch (err) {
             return { ok: false, artworks: [], error: safeError('unexpected_error', '공개 작품 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 공유 토큰(share_token)으로 공개 작품 1건을 조회한다. 12_add_artwork_share_token.sql이
+    // 만든 값과 동일한 형식(소문자 16진수 32자)만 사전에 통과시키고, 그
+    // 형식조차 최종 보안 경계는 아니다 - RLS(artworks_select_public)가
+    // status='approved' AND exhibitions.visibility='public' AND
+    // exhibitions.operation_status='operating'을 다시 강제하는 최종
+    // 방어선이다. 비공개·준비중·pending/rejected/hidden 작품은 토큰이
+    // 맞더라도 이 조회에서 존재 여부조차 구분되지 않고 동일하게 "찾을 수
+    // 없음"으로 처리된다(찾았지만 비공개라서 막힌 것인지, 애초에 그런
+    // 토큰이 없는 것인지 호출자가 구분할 수 없게 만들어 열거 공격의
+    // 신호를 주지 않는다). 반환 필드는 공개 상세보기에 필요한 화이트리스트
+    // (exhibition_id 포함, 어떤 전시관으로 진입할지 알아야 하므로)만 사용한다.
+    var SHARE_TOKEN_RE = /^[0-9a-f]{32}$/;
+
+    function isValidShareToken(value) {
+        return typeof value === 'string' && SHARE_TOKEN_RE.test(value);
+    }
+
+    async function getPublicArtworkByShareToken(token) {
+        if (!isValidShareToken(token)) {
+            return { ok: false, artwork: null, error: safeError('invalid_share_token', '공개된 작품을 찾을 수 없습니다.') };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, artwork: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .select(`
+                    id,
+                    exhibition_id,
+                    title,
+                    media_type,
+                    artist_display_name,
+                    category_id,
+                    thumbnail_url,
+                    media_url,
+                    external_url,
+                    share_token,
+                    description,
+                    poem,
+                    categories (
+                        id,
+                        name
+                    ),
+                    exhibitions!inner (
+                        visibility,
+                        operation_status
+                    )
+                `)
+                .eq('share_token', token)
+                .eq('status', 'approved')
+                .eq('exhibitions.visibility', 'public')
+                .eq('exhibitions.operation_status', 'operating')
+                .maybeSingle();
+
+            // 조회 자체가 실패한 경우(네트워크·DB 오류)와 "그런 작품이 없음"을
+            // 동일한 안전한 메시지로 합쳐, 내부 오류 원문을 노출하지 않는다.
+            if (error || !data) {
+                return { ok: false, artwork: null, error: safeError('artwork_not_found', '공개된 작품을 찾을 수 없습니다.') };
+            }
+
+            return {
+                ok: true,
+                artwork: {
+                    id: data.id,
+                    exhibition_id: data.exhibition_id,
+                    title: data.title,
+                    media_type: data.media_type,
+                    artist_display_name: data.artist_display_name,
+                    category_id: data.category_id,
+                    thumbnail_url: data.thumbnail_url,
+                    media_url: data.media_url,
+                    external_url: data.external_url,
+                    share_token: data.share_token,
+                    description: data.description,
+                    poem: data.poem,
+                    categories: data.categories
+                },
+                error: null
+            };
+        } catch (err) {
+            return { ok: false, artwork: null, error: safeError('artwork_not_found', '공개된 작품을 찾을 수 없습니다.') };
         }
     }
 
@@ -2080,6 +2170,7 @@
         getCategories: getCategories,
         getPublicExhibitions: getPublicExhibitions,
         getPublicArtworksForExhibition: getPublicArtworksForExhibition,
+        getPublicArtworkByShareToken: getPublicArtworkByShareToken,
         createManagedArtwork: createManagedArtwork,
         createManagedImageArtwork: createManagedImageArtwork,
         createManagedUnifiedArtwork: createManagedUnifiedArtwork,
