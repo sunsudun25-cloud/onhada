@@ -40,12 +40,51 @@
 --   이 백필(3번)이 끝나 모든 행이 NOT NULL을 만족한 뒤에 생성하므로, UPDATE
 --   분기는 "OLD가 NULL일 수 있는 경우"를 별도로 처리할 필요가 없다.
 --
+-- [백필 중 상태 트리거 일시 비활성화 - 데이터 손상 방지]
+--   08_manager_own_artwork_workflow.sql이 만든 trg_enforce_artwork_status
+--   트리거(→ enforce_artwork_status())는 public.artworks에 대한 모든
+--   INSERT/UPDATE에서 무조건 실행되며, UPDATE의 SET 절에 어떤 컬럼이
+--   나열되어 있는지와 무관하게 매번 NEW 전체를 검사·재작성한다. Supabase
+--   SQL Editor에서 이 파일을 실행하는 세션은 앱의 로그인 JWT 세션이
+--   아니므로 auth.uid()가 NULL이고, 그 결과 enforce_artwork_status()
+--   내부의 public.is_admin()도 false를 반환하며, manager 자가승인 전용
+--   ELSIF 분기도 "OLD.submitted_by = auth.uid()" 비교가 NULL과의 비교라
+--   항상 통과하지 못한다. 즉 아래 3번 백필 UPDATE를 트리거 비활성화 없이
+--   그대로 실행하면 이 기존 트리거의 ELSE 분기(admin도 아니고 자가승인
+--   조건도 아닌 경우)가 실행되어, share_token만 SET하려던 UPDATE임에도
+--   28개 작품 전부의 status가 강제로 'pending'이 되고 approved_by/
+--   approved_at이 NULL로 초기화된다 - 이미 승인되어 공개 전시 중인 26개
+--   작품이 백필 직후 즉시 비공개 상태로 전환되는 실제 데이터 손상이다.
+--   이를 막기 위해 아래 3번 백필을 단일 DO 블록으로 감싸고, 그 안에서만
+--   trg_enforce_artwork_status 하나만 정확히 지정해 일시 비활성화한다.
+--   session_replication_role은 세션의 모든 트리거·FK 검사를 끄므로 여기서
+--   쓰지 않으며, SQL 10/11의 trg_enforce_video_artwork_paths나 이 파일이
+--   뒤에서 새로 만드는 trg_enforce_artwork_share_token은 전혀 건드리지
+--   않는다. ALTER TABLE ... DISABLE/ENABLE TRIGGER는 PostgreSQL에서
+--   트랜잭션 범위의 DDL이며, DO 블록의 EXCEPTION 절은 그 BEGIN 블록
+--   전체를 서브트랜잭션(SAVEPOINT)으로 감싼다 - 백필 도중 어떤 오류가
+--   나더라도 EXCEPTION 핸들러 코드가 실행되기 전에 그 서브트랜잭션이
+--   자동으로 DISABLE 이전 상태로 롤백되어 트리거는 이미 다시 활성
+--   상태이며, 핸들러의 명시적 ENABLE 호출은 이 자동 복구를 전제로 한
+--   이중 방어일 뿐이다(이미 활성화된 트리거에 ENABLE을 다시 실행해도
+--   오류가 나지 않는다). 또한 DISABLE TRIGGER는 SHARE ROW EXCLUSIVE
+--   잠금을 트랜잭션 종료까지 유지하므로, 이 DO 블록이 실행되는 짧은
+--   구간 동안에는 다른 세션의 artworks INSERT/UPDATE/DELETE(ROW EXCLUSIVE
+--   필요)가 전부 대기 상태로 차단되어, 트리거가 꺼져 있는 틈을 다른
+--   요청이 파고들 여지가 없다. pg_trigger 조회로 트리거가 실제로 존재
+--   하고 현재 활성 상태(tgenabled <> 'D')일 때만 DISABLE/ENABLE 쌍을
+--   실행하므로, 이미 비활성 상태였던 경우(트리거 자체가 없는 경우
+--   포함)는 그 상태를 그대로 두어 이 파일이 의도치 않게 트리거를 새로
+--   켜거나 끄지 않는다.
+--
 -- [재실행 가능성]
 --   컬럼 추가는 ADD COLUMN IF NOT EXISTS, 함수는 CREATE OR REPLACE, 트리거는
 --   DROP TRIGGER IF EXISTS 후 재생성, UNIQUE 제약은 pg_constraint를 먼저
 --   확인하는 DO 블록으로 감싸 재실행해도 오류가 나지 않는다. 백필 UPDATE는
 --   share_token IS NULL 조건이 있어 이미 채워진 행을 다시 건드리지 않으므로
---   재실행해도 추가로 할 일이 없으면 그대로 0건 처리된다. 기존 작품의
+--   재실행해도 추가로 할 일이 없으면 그대로 0건 처리된다. 위 상태 트리거
+--   일시 비활성화도 매번 pg_trigger를 다시 조회해 판단하므로 몇 번을
+--   재실행해도 트리거가 비활성 상태로 누적되어 남지 않는다. 기존 작품의
 --   내용·상태·경로·ID는 이 파일 어디에서도 변경·삭제하지 않는다.
 -- =========================================================================
 
@@ -97,10 +136,52 @@ REVOKE ALL ON FUNCTION public.generate_artwork_share_token() FROM authenticated;
 -- 3. 기존 작품 백필 - share_token IS NULL인 행에만 발급한다. 이 시점에는
 --    아직 6번의 트리거가 없으므로 이 UPDATE의 SET 값이 그대로 저장된다.
 --    내용·상태·경로·ID는 이 UPDATE에서 전혀 건드리지 않는다.
+--
+--    02_security.sql/08_manager_own_artwork_workflow.sql이 이미 만들어 둔
+--    trg_enforce_artwork_status는 share_token만 SET하는 이 UPDATE에도
+--    무조건 실행되어, SQL Editor 세션(auth.uid() IS NULL)에서는 그 ELSE
+--    분기가 실행되므로, 아래 UPDATE를 실행하는 구간에서만 그 트리거
+--    하나를 정확히 지정해 일시 비활성화한다(위 헤더 "[백필 중 상태
+--    트리거 일시 비활성화 - 데이터 손상 방지]" 참고). 다른 트리거나
+--    session_replication_role은 전혀 건드리지 않는다.
 -- -------------------------------------------------------------------------
-UPDATE public.artworks
-SET share_token = public.generate_artwork_share_token()
-WHERE share_token IS NULL;
+DO $$
+DECLARE
+    v_should_restore BOOLEAN := false;
+BEGIN
+    -- 트리거가 실제로 존재하고 현재 활성 상태(tgenabled <> 'D')일 때만
+    -- true가 된다. 트리거 자체가 없거나 이미 비활성 상태였다면 false로
+    -- 남아 아래 DISABLE/ENABLE을 모두 건너뛰어 기존 상태를 그대로 둔다.
+    SELECT (tgenabled <> 'D') INTO v_should_restore
+    FROM pg_trigger
+    WHERE tgname = 'trg_enforce_artwork_status'
+      AND tgrelid = 'public.artworks'::regclass
+      AND NOT tgisinternal;
+
+    IF v_should_restore THEN
+        ALTER TABLE public.artworks DISABLE TRIGGER trg_enforce_artwork_status;
+    END IF;
+
+    UPDATE public.artworks
+    SET share_token = public.generate_artwork_share_token()
+    WHERE share_token IS NULL;
+
+    IF v_should_restore THEN
+        ALTER TABLE public.artworks ENABLE TRIGGER trg_enforce_artwork_status;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- PL/pgSQL의 EXCEPTION 절은 이 BEGIN 블록 전체를 서브트랜잭션으로
+        -- 감싸므로, 여기 도달한 시점에는 위에서 실행한 DISABLE TRIGGER가
+        -- 이미 자동으로 롤백되어 트리거가 다시 활성 상태다. 아래 ENABLE은
+        -- 그 자동 복구를 전제로 한 이중 방어이며, 이미 활성화된 트리거에
+        -- 다시 실행해도 오류가 나지 않는다.
+        IF v_should_restore THEN
+            ALTER TABLE public.artworks ENABLE TRIGGER trg_enforce_artwork_status;
+        END IF;
+        RAISE;
+END;
+$$;
 
 
 -- -------------------------------------------------------------------------
