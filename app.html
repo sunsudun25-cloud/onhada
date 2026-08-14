@@ -3019,7 +3019,18 @@
             <!-- 영상 작품 전용. 이미지/문서 wrap과 완전히 분리된 영역이며, 이
                  영역이 보일 때는 이미지/문서 wrap이 둘 다 숨겨진다. -->
             <div id="onhada-manager-unified-file-video-wrap" style="display:none;">
-              <!-- 등록 방식 선택 - 기본값은 항상 "MP4 직접 올리기". -->
+              <!-- 수정 모드에서만 표시. 내부 Storage 경로·DB UUID·외부 원본 URL은
+                   여기 어디에도 넣지 않고, 썸네일만 안전한 Blob 다운로드로
+                   미리보기한다(7번 요구사항). 새 파일/링크를 고르지 않으면
+                   아래 안내대로 현재 영상이 그대로 유지된다. -->
+              <div id="onhada-manager-unified-video-edit-current-wrap" style="display:none; margin-bottom:16px; padding:12px; border:1px solid var(--card-border); border-radius:10px;">
+                <p id="onhada-manager-unified-video-edit-current-label" style="color:var(--text-gray); font-size:0.85rem; margin-bottom:8px;"></p>
+                <img id="onhada-manager-unified-video-edit-current-thumbnail" alt="현재 등록된 썸네일 미리보기" style="max-width:100%; border-radius:10px; display:none; margin-bottom:8px;">
+                <p style="color:var(--text-gray); font-size:0.8rem;">새 영상·링크를 선택하지 않으면 현재 영상이 그대로 유지됩니다. 썸네일만 새로 캡처하거나 선택하면 영상은 유지한 채 썸네일만 바뀝니다.</p>
+              </div>
+              <!-- 등록 방식 선택 - 기본값은 항상 "MP4 직접 올리기"(신규 등록 시).
+                   수정 모드에서는 onhadaManagerUnifiedStartEdit()이 현재
+                   작품의 실제 방식으로 다시 맞춰 준다. -->
               <div style="margin-bottom:16px; display:flex; flex-direction:column; gap:10px;">
                 <label style="color:var(--text-gray); font-size:0.9rem; display:flex; align-items:center; gap:8px; cursor:pointer; padding:12px; border:1px solid var(--card-border); border-radius:10px;">
                   <input type="radio" name="onhada-manager-unified-video-source" id="onhada-manager-unified-video-source-upload" value="upload" checked onchange="onhadaManagerUnifiedSelectVideoSource('upload')" style="width:18px; height:18px;">
@@ -3036,6 +3047,7 @@
                 <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">MP4 영상 선택</label>
                 <input type="file" id="onhada-manager-unified-file-video" class="form-control" accept="video/mp4" onchange="onhadaManagerUnifiedHandleFileChange(this)" style="margin-bottom:8px;">
                 <p style="color:var(--text-gray); font-size:0.8rem; margin-bottom:14px;">MP4 · 50MB 이하</p>
+                <p id="onhada-manager-unified-video-upload-edit-hint" style="display:none; color:var(--text-gray); font-size:0.8rem; margin-top:-8px; margin-bottom:14px;">비워 두면 현재 영상이 유지됩니다.</p>
 
                 <div id="onhada-manager-unified-video-preview-wrap" style="display:none; margin-bottom:14px;">
                   <video id="onhada-manager-unified-video-preview" controls playsinline style="width:100%; border-radius:10px; display:block; background:#000; margin-bottom:8px;"></video>
@@ -3058,6 +3070,7 @@
               <div id="onhada-manager-unified-video-external-block" style="display:none;">
                 <label style="color:var(--text-gray); font-size:0.85rem; display:block; margin-bottom:4px;">영상 주소 입력</label>
                 <input type="url" id="onhada-manager-unified-external-url-input" class="form-control" placeholder="https://...mp4" style="margin-bottom:8px;" oninput="onhadaManagerUnifiedInvalidateExternalUrlOnInput()">
+                <p id="onhada-manager-unified-external-url-edit-hint" style="display:none; color:var(--text-gray); font-size:0.8rem; margin-top:-4px; margin-bottom:8px;">새 링크를 확인하지 않으면 현재 링크가 유지됩니다.</p>
                 <button type="button" class="btn-hero-secondary" id="onhada-manager-unified-external-check-btn" onclick="onhadaManagerUnifiedCheckExternalVideoUrl()" style="width:100%; margin-bottom:8px;">영상 확인</button>
                 <p id="onhada-manager-unified-external-url-status" style="color:var(--text-gray); font-size:0.8rem; margin-bottom:14px;"></p>
 
@@ -3657,10 +3670,10 @@
   <!-- ============================================== -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
-  <script src="js/supabase-client.js?v=20260811-7"></script>
-  <script src="js/auth-service.js?v=20260811-7"></script>
-  <script src="js/db-service.js?v=20260811-7"></script>
-  <script src="js/storage-service.js?v=20260811-7"></script>
+  <script src="js/supabase-client.js?v=20260811-8"></script>
+  <script src="js/auth-service.js?v=20260811-8"></script>
+  <script src="js/db-service.js?v=20260811-8"></script>
+  <script src="js/storage-service.js?v=20260811-8"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -6143,6 +6156,22 @@
     let onhadaManagerUnifiedEditOriginalMediaType = null;
     let onhadaManagerUnifiedEditOriginalMediaUrl = null;
     let onhadaManagerUnifiedEditOriginalThumbnailUrl = null;
+    // 영상 수정 전용 - 이미지/문서는 항상 null로 둔다. ExternalUrl은 기존
+    // 외부 링크(있다면), VideoSource는 그 작품이 원래 어느 방식이었는지
+    // ('upload'|'external')를 기록해, 사용자가 방식을 다른 쪽으로 바꾸면
+    // (예: 직접 업로드→외부 링크) "유지" 옵션 자체를 더 이상 쓸 수 없고
+    // 반드시 새 파일/링크를 제공해야 한다고 판단하는 기준으로 쓴다.
+    let onhadaManagerUnifiedEditOriginalExternalUrl = null;
+    let onhadaManagerUnifiedEditOriginalVideoSource = null;
+    // "현재 영상 유지" 안내 블록의 썸네일 미리보기 전용 Blob URL. 새로
+    // 캡처/선택한 썸네일 상태(onhadaManagerUnifiedThumbnailBlob/PreviewUrl)와
+    // 완전히 분리해 둔다 - 이 값이 있다고 해서 "새 썸네일을 골랐다"고
+    // 오판하지 않기 위함이다(제출 시 이 값은 참조하지 않는다).
+    let onhadaManagerUnifiedVideoEditCurrentThumbnailPreviewUrl = null;
+    // 수정 모드 진입 시 현재 썸네일을 내려받는 요청의 stale 가드. 수정
+    // 모드를 벗어나거나(취소/제출/다른 작품 수정 시작) 값이 바뀌면 늦게
+    // 도착한 다운로드 결과를 화면에 반영하지 않는다.
+    let onhadaManagerUnifiedVideoEditRequestSeq = 0;
     // manager 본인 작품 목록의 최신 조회 결과. renderManagedArtworks()가
     // 채우고, 수정/승인/삭제 버튼 클릭 핸들러가 배열 index로만 값을
     // 클로저 캡처해 이 배열에서 다시 조회한다(artwork id/submitted_by를
@@ -6878,6 +6907,25 @@
       onhadaManagerUnifiedEditOriginalMediaType = null;
       onhadaManagerUnifiedEditOriginalMediaUrl = null;
       onhadaManagerUnifiedEditOriginalThumbnailUrl = null;
+      onhadaManagerUnifiedEditOriginalExternalUrl = null;
+      onhadaManagerUnifiedEditOriginalVideoSource = null;
+
+      // 수정 모드에서만 쓰는 "현재 영상 유지" 미리보기 썸네일 Blob URL도
+      // 함께 정리한다 - 새로 캡처/선택한 썸네일(onhadaManagerUnifiedThumbnailBlob/
+      // PreviewUrl)과는 완전히 별개의 변수이므로 여기서 따로 revoke해야 한다.
+      if (onhadaManagerUnifiedVideoEditCurrentThumbnailPreviewUrl) {
+        URL.revokeObjectURL(onhadaManagerUnifiedVideoEditCurrentThumbnailPreviewUrl);
+        onhadaManagerUnifiedVideoEditCurrentThumbnailPreviewUrl = null;
+      }
+      onhadaManagerUnifiedVideoEditRequestSeq += 1;
+      const videoEditCurrentWrapEl = document.getElementById('onhada-manager-unified-video-edit-current-wrap');
+      const videoEditCurrentThumbEl = document.getElementById('onhada-manager-unified-video-edit-current-thumbnail');
+      const videoUploadEditHintEl = document.getElementById('onhada-manager-unified-video-upload-edit-hint');
+      const externalUrlEditHintEl = document.getElementById('onhada-manager-unified-external-url-edit-hint');
+      if (videoEditCurrentWrapEl) videoEditCurrentWrapEl.style.display = 'none';
+      if (videoEditCurrentThumbEl) { videoEditCurrentThumbEl.removeAttribute('src'); videoEditCurrentThumbEl.style.display = 'none'; }
+      if (videoUploadEditHintEl) videoUploadEditHintEl.style.display = 'none';
+      if (externalUrlEditHintEl) externalUrlEditHintEl.style.display = 'none';
 
       const titleEl = document.getElementById('onhada-manager-unified-title');
       const authorEl = document.getElementById('onhada-manager-unified-author');
@@ -6977,10 +7025,15 @@
       if (step === 2) {
         if (stepDescEl) {
           if (onhadaManagerUnifiedMediaType === 'video') {
-            // 수정 모드는 video에서 도달하지 않는 경로이므로 등록 문구만 둔다.
-            stepDescEl.textContent = onhadaManagerUnifiedVideoSource === 'external'
-              ? '기존 영상 링크를 입력해 확인한 뒤, 썸네일을 캡처하거나 이미지를 직접 선택하세요.'
-              : 'MP4 영상을 선택하고, 재생 위치를 옮겨 장면을 썸네일로 캡처하세요.';
+            if (onhadaManagerUnifiedEditMode) {
+              stepDescEl.textContent = onhadaManagerUnifiedVideoSource === 'external'
+                ? '새 링크를 확인하지 않으면 현재 링크를 유지합니다. 교체하려면 새 링크를 입력해 확인하세요.'
+                : '새 영상을 선택하지 않으면 현재 영상을 유지합니다. 교체하려면 MP4 영상을 선택하세요.';
+            } else {
+              stepDescEl.textContent = onhadaManagerUnifiedVideoSource === 'external'
+                ? '기존 영상 링크를 입력해 확인한 뒤, 썸네일을 캡처하거나 이미지를 직접 선택하세요.'
+                : 'MP4 영상을 선택하고, 재생 위치를 옮겨 장면을 썸네일로 캡처하세요.';
+            }
           } else if (onhadaManagerUnifiedEditMode) {
             stepDescEl.textContent = onhadaManagerUnifiedMediaType === 'document'
               ? '새 파일을 선택하지 않으면 현재 파일을 유지합니다. 교체하려면 PDF 또는 이미지(JPG/PNG/WEBP) 파일을 선택하세요.'
@@ -7670,15 +7723,65 @@
     function onhadaManagerUnifiedValidateStep2() {
       const statusEl = document.getElementById('onhada-manager-unified-status');
 
-      // 영상 + 외부 링크는 파일을 전혀 선택하지 않으므로, 아래 공용
-      // "파일 필수" 검사보다 먼저 별도로 분기해 처리한다.
-      if (onhadaManagerUnifiedMediaType === 'video' && onhadaManagerUnifiedVideoSource === 'external') {
-        if (!onhadaManagerUnifiedExternalUrlVerified) {
-          if (statusEl) statusEl.textContent = '먼저 영상 링크를 확인해 주세요.';
+      // 영상은 이미지/문서와 검증 흐름이 완전히 달라(파일 필수 여부·소스
+      // 전환·"유지" 개념) 아래 공용 로직과 분리된 자체 블록에서 전부
+      // 처리하고 함수를 끝낸다.
+      if (onhadaManagerUnifiedMediaType === 'video') {
+        // 수정 모드이면서 원래 방식과 지금 선택된 방식이 같을 때만 "유지"가
+        // 가능하다. 방식을 바꿨다면(예: 직접 업로드→외부 링크) 유지할
+        // 대상 자체가 없으므로 반드시 새 파일/링크를 제공해야 한다.
+        const sourceChanged = onhadaManagerUnifiedEditMode
+          && onhadaManagerUnifiedEditOriginalVideoSource
+          && onhadaManagerUnifiedEditOriginalVideoSource !== onhadaManagerUnifiedVideoSource;
+        const isKeepable = onhadaManagerUnifiedEditMode && !sourceChanged;
+
+        if (onhadaManagerUnifiedVideoSource === 'external') {
+          const hasNewExternalLink = onhadaManagerUnifiedExternalUrlVerified;
+
+          if (isKeepable && !hasNewExternalLink) {
+            // 링크는 유지, 썸네일은 선택 사항(재캡처/재선택하지 않으면 기존 유지).
+            return true;
+          }
+          if (!onhadaManagerUnifiedExternalUrlVerified) {
+            if (statusEl) statusEl.textContent = '먼저 영상 링크를 확인해 주세요.';
+            return false;
+          }
+          if (!(onhadaManagerUnifiedThumbnailBlob instanceof Blob)) {
+            if (statusEl) statusEl.textContent = '썸네일을 캡처하거나 이미지를 선택해 주세요.';
+            return false;
+          }
+          return true;
+        }
+
+        // onhadaManagerUnifiedVideoSource === 'upload'
+        const videoFile = onhadaManagerUnifiedFile;
+        const hasNewFile = videoFile instanceof File || videoFile instanceof Blob;
+
+        if (isKeepable && !hasNewFile) {
+          // 영상은 유지, 썸네일은 선택 사항.
+          return true;
+        }
+
+        if (!hasNewFile) {
+          if (statusEl) statusEl.textContent = '파일을 선택해 주세요.';
+          return false;
+        }
+
+        if (!(videoFile.size > 0)) {
+          if (statusEl) statusEl.textContent = '선택한 파일이 비어 있습니다. 다른 파일을 선택해 주세요.';
+          return false;
+        }
+
+        if (videoFile.type !== 'video/mp4') {
+          if (statusEl) statusEl.textContent = 'MP4 형식만 등록할 수 있습니다.';
+          return false;
+        }
+        if (videoFile.size > 50 * 1024 * 1024) {
+          if (statusEl) statusEl.textContent = '영상 용량은 50MB를 초과할 수 없습니다.';
           return false;
         }
         if (!(onhadaManagerUnifiedThumbnailBlob instanceof Blob)) {
-          if (statusEl) statusEl.textContent = '썸네일을 캡처하거나 이미지를 선택해 주세요.';
+          if (statusEl) statusEl.textContent = '먼저 장면을 캡처해 썸네일을 만들어 주세요.';
           return false;
         }
         return true;
@@ -7735,23 +7838,8 @@
         return false;
       }
 
-      if (onhadaManagerUnifiedMediaType === 'video') {
-        if (file.type !== 'video/mp4') {
-          if (statusEl) statusEl.textContent = 'MP4 형식만 등록할 수 있습니다.';
-          return false;
-        }
-        if (file.size > 50 * 1024 * 1024) {
-          if (statusEl) statusEl.textContent = '영상 용량은 50MB를 초과할 수 없습니다.';
-          return false;
-        }
-        // 영상 작품은 썸네일이 없으면 등록할 수 없다.
-        if (!(onhadaManagerUnifiedThumbnailBlob instanceof Blob)) {
-          if (statusEl) statusEl.textContent = '먼저 장면을 캡처해 썸네일을 만들어 주세요.';
-          return false;
-        }
-        return true;
-      }
-
+      // video는 함수 상단의 전용 블록에서 이미 처리되고 반환되므로 여기
+      // 아래로는 도달하지 않는다.
       return false;
     }
 
@@ -8445,8 +8533,8 @@
       // 2. 본인 작품인지 재확인
       if (art.submitted_by !== currentOperatorContext.userId) return;
 
-      // 3. image/document인지 확인
-      if (['image', 'document'].indexOf(art.media_type) === -1) return;
+      // 3. image/document/video인지 확인
+      if (['image', 'document', 'video'].indexOf(art.media_type) === -1) return;
 
       // 4. hidden이 아닌지 확인
       if (art.status === 'hidden') return;
@@ -8488,6 +8576,15 @@
       if (descEl) descEl.value = art.description || '';
       if (consentEl) consentEl.checked = art.consent_confirmed === true;
 
+      // 9. 영상 작품 전용 - 현재 방식(직접 업로드/외부 링크)을 그대로
+      // 반영하고, "현재 영상 유지" 안내 + 썸네일 미리보기를 준비한다.
+      if (art.media_type === 'video') {
+        onhadaManagerUnifiedEditOriginalExternalUrl = art.external_url;
+        onhadaManagerUnifiedEditOriginalVideoSource = art.media_url ? 'upload' : 'external';
+        onhadaManagerUnifiedVideoSource = onhadaManagerUnifiedEditOriginalVideoSource;
+        onhadaManagerUnifiedStartVideoEditPreview(art);
+      }
+
       onhadaRenderManagerUnifiedStep();
 
       // 카테고리 옵션이 채워진 뒤에 값을 세팅해야 하므로 populate 완료를 기다린다.
@@ -8496,6 +8593,73 @@
         const categoryEl = document.getElementById('onhada-manager-unified-category');
         if (categoryEl && categoryIdToSelect) categoryEl.value = categoryIdToSelect;
       });
+    }
+
+    // 영상 수정 모드 진입 시 "현재 영상 유지" 안내와 썸네일 미리보기,
+    // 방식별 안내 문구·입력값을 준비한다. 내부 Storage 경로나 DB UUID는
+    // 화면 어디에도 넣지 않는다 - 썸네일은 downloadArtworkAsset()으로 받은
+    // Blob만 미리보기하고, 직접 업로드 영상 자체의 재생 미리보기는 만들지
+    // 않는다(요구사항은 썸네일 미리보기까지만 명시).
+    async function onhadaManagerUnifiedStartVideoEditPreview(art) {
+      const wrapEl = document.getElementById('onhada-manager-unified-video-edit-current-wrap');
+      const labelEl = document.getElementById('onhada-manager-unified-video-edit-current-label');
+      const thumbEl = document.getElementById('onhada-manager-unified-video-edit-current-thumbnail');
+      const uploadHintEl = document.getElementById('onhada-manager-unified-video-upload-edit-hint');
+      const externalHintEl = document.getElementById('onhada-manager-unified-external-url-edit-hint');
+      const externalUrlInputEl = document.getElementById('onhada-manager-unified-external-url-input');
+
+      if (wrapEl) wrapEl.style.display = 'block';
+      if (labelEl) {
+        labelEl.textContent = onhadaManagerUnifiedEditOriginalVideoSource === 'upload'
+          ? '현재 직접 업로드된 영상이 등록되어 있습니다.'
+          : '현재 외부 링크 영상이 등록되어 있습니다.';
+      }
+      if (onhadaManagerUnifiedEditOriginalVideoSource === 'upload' && uploadHintEl) {
+        uploadHintEl.style.display = 'block';
+      }
+      if (onhadaManagerUnifiedEditOriginalVideoSource === 'external' && externalHintEl) {
+        externalHintEl.style.display = 'block';
+      }
+
+      // 외부 링크는 사용자 본인이 등록한 값이며 검증을 통과한 HTTPS MP4
+      // 주소이므로, 참고용으로 입력창에 그대로 보여준다(재확인 없이는
+      // "새 링크"로 취급하지 않는다 - onhadaManagerUnifiedExternalUrlVerified는
+      // 여기서 true로 세팅하지 않는다).
+      if (onhadaManagerUnifiedEditOriginalVideoSource === 'external' && externalUrlInputEl) {
+        externalUrlInputEl.value = onhadaManagerUnifiedEditOriginalExternalUrl || '';
+      }
+
+      const thumbPath = art.thumbnail_url;
+      if (!thumbPath) return;
+
+      onhadaManagerUnifiedVideoEditRequestSeq += 1;
+      const requestSeq = onhadaManagerUnifiedVideoEditRequestSeq;
+
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadArtworkAsset(thumbPath);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      // stale 가드: 그 사이 수정이 취소되거나 다른 작품 수정을 시작했으면 반영하지 않는다.
+      if (requestSeq !== onhadaManagerUnifiedVideoEditRequestSeq) return;
+      if (!onhadaManagerUnifiedEditMode || onhadaManagerUnifiedMediaType !== 'video') return;
+
+      if (!result.ok || !result.blob) return;
+
+      const previewUrl = URL.createObjectURL(result.blob);
+
+      if (requestSeq !== onhadaManagerUnifiedVideoEditRequestSeq) {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+
+      onhadaManagerUnifiedVideoEditCurrentThumbnailPreviewUrl = previewUrl;
+      if (thumbEl) {
+        thumbEl.src = previewUrl;
+        thumbEl.style.display = 'block';
+      }
     }
 
     // 수정 제출 오케스트레이션. onhadaManagerUnifiedSubmit()(신규 등록)의
@@ -8537,7 +8701,7 @@
         return;
       }
 
-      if (['image', 'document'].indexOf(currentArt.media_type) === -1) {
+      if (['image', 'document', 'video'].indexOf(currentArt.media_type) === -1) {
         onhadaResetManagerUnifiedState();
         onhadaRenderManagerUnifiedStep();
         return;
@@ -8557,6 +8721,14 @@
           { title: '작품 수정 확인', confirmLabel: '수정 계속', cancelLabel: '취소', danger: false }
         );
         if (!confirmed) return;
+      }
+
+      // 영상은 검증(4)·승인 확인(5)까지는 이미지/문서와 완전히 동일하게
+      // 거쳤으므로, 이 지점부터는 별도 함수(업로드/RPC/보상 정리 방식이
+      // 근본적으로 다름)로 넘긴다.
+      if (currentArt.media_type === 'video') {
+        await onhadaManagerUnifiedSubmitVideoEdit(currentArt, artworkId);
+        return;
       }
 
       const statusEl = document.getElementById('onhada-manager-unified-status');
@@ -8703,6 +8875,199 @@
       }
     }
 
+    // 영상 작품 수정 제출. onhadaManagerUnifiedSubmitEdit()이 공통 검증
+    // (입력 형식·approved 확인)까지 마친 뒤에만 호출한다. 순서: 필요한
+    // 경우에만 새 영상 업로드 → 필요한 경우에만 새 썸네일 업로드 →
+    // update_own_video_artwork RPC → 성공 후 이전 미사용 자산만 정리.
+    // 외부 링크(previousExternalUrl)는 Storage 삭제 대상이 아니므로
+    // onhadaManagerUnifiedCleanupPaths에 절대 넘기지 않는다 - 이미
+    // updateOwnVideoArtworkAsManager의 cleanup 객체 자체가 그 값을
+    // Storage 경로와 분리해 반환하므로, 여기서도 media_url/thumbnail_url
+    // 두 값만 사용한다.
+    async function onhadaManagerUnifiedSubmitVideoEdit(currentArt, artworkId) {
+      const statusEl = document.getElementById('onhada-manager-unified-status');
+      const prevBtn = document.getElementById('onhada-manager-unified-prev-btn');
+      const nextBtn = document.getElementById('onhada-manager-unified-next-btn');
+
+      const processingExhibitionId = currentManagedExhibitionId;
+      onhadaManagerUnifiedRequestToken += 1;
+      const requestToken = onhadaManagerUnifiedRequestToken;
+
+      onhadaManagerUnifiedSubmitting = true;
+      if (prevBtn) prevBtn.disabled = true;
+      if (nextBtn) nextBtn.disabled = true;
+      if (statusEl) statusEl.textContent = '작품을 수정하는 중입니다...';
+
+      const title = document.getElementById('onhada-manager-unified-title').value.trim();
+      const author = document.getElementById('onhada-manager-unified-author').value.trim();
+      const categoryId = document.getElementById('onhada-manager-unified-category').value;
+      const description = document.getElementById('onhada-manager-unified-description').value.trim();
+
+      const videoSource = onhadaManagerUnifiedVideoSource;
+      const file = onhadaManagerUnifiedFile;
+      const hasNewFile = videoSource === 'upload' && (file instanceof File || file instanceof Blob);
+      const hasNewExternalLink = videoSource === 'external' && onhadaManagerUnifiedExternalUrlVerified;
+      const thumbnailBlob = onhadaManagerUnifiedThumbnailBlob;
+      const hasNewThumbnail = thumbnailBlob instanceof Blob;
+
+      try {
+        let mediaPathForPayload = null;
+        let externalUrlForPayload = null;
+        let thumbnailPathForPayload = null;
+        // 이번 제출에서 새로 올라간 자산만 담는다 - 실패 시 정확히 이
+        // 목록만 보상 삭제하고, 기존 자산은 절대 건드리지 않는다.
+        let newlyUploadedVideoPath = null;
+        let newlyUploadedThumbnailPath = null;
+
+        if (videoSource === 'upload') {
+          if (hasNewFile) {
+            // 1. 새 영상 업로드
+            let videoUploadResult;
+            try {
+              videoUploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkVideo(processingExhibitionId, file);
+            } catch (err) {
+              videoUploadResult = { ok: false, path: null, error: { code: 'unexpected_error', message: '영상 업로드 중 오류가 발생했습니다.' } };
+            }
+
+            if (!videoUploadResult.ok) {
+              if (requestToken !== onhadaManagerUnifiedRequestToken) return;
+              if (statusEl) statusEl.textContent = (videoUploadResult.error && videoUploadResult.error.message) || '영상 업로드에 실패했습니다.';
+              return;
+            }
+
+            newlyUploadedVideoPath = videoUploadResult.path;
+
+            if (requestToken !== onhadaManagerUnifiedRequestToken || currentManagedExhibitionId !== processingExhibitionId) {
+              await onhadaManagerUnifiedRemoveVideoSilently(newlyUploadedVideoPath);
+              return;
+            }
+
+            mediaPathForPayload = newlyUploadedVideoPath;
+          } else {
+            // 영상 유지(방식이 원래도 upload였을 때만 이 분기에 도달 -
+            // onhadaManagerUnifiedValidateStep2가 이미 이를 보장한다).
+            mediaPathForPayload = onhadaManagerUnifiedEditOriginalMediaUrl;
+          }
+        } else {
+          // 외부 링크
+          externalUrlForPayload = hasNewExternalLink
+            ? onhadaManagerUnifiedExternalUrl
+            : onhadaManagerUnifiedEditOriginalExternalUrl;
+        }
+
+        if (hasNewThumbnail) {
+          // 2. 새 썸네일 업로드(캡처 Blob은 파일명이 없으므로 고정 이름으로 감싼다).
+          const thumbnailExt = thumbnailBlob.type === 'image/webp' ? 'webp' : 'jpg';
+          const thumbnailFile = new File([thumbnailBlob], 'thumbnail.' + thumbnailExt, { type: thumbnailBlob.type });
+
+          let thumbnailUploadResult;
+          try {
+            thumbnailUploadResult = await window.ONHADA_BACKEND.storage.uploadManagedArtworkImage(processingExhibitionId, thumbnailFile);
+          } catch (err) {
+            thumbnailUploadResult = { ok: false, path: null, error: { code: 'unexpected_error', message: '썸네일 업로드 중 오류가 발생했습니다.' } };
+          }
+
+          if (!thumbnailUploadResult.ok) {
+            // 새 영상까지 이미 올렸다면 함께 보상 삭제한다.
+            if (newlyUploadedVideoPath) await onhadaManagerUnifiedRemoveVideoSilently(newlyUploadedVideoPath);
+            if (requestToken !== onhadaManagerUnifiedRequestToken) return;
+            if (statusEl) statusEl.textContent = (thumbnailUploadResult.error && thumbnailUploadResult.error.message) || '썸네일 업로드에 실패했습니다.';
+            return;
+          }
+
+          newlyUploadedThumbnailPath = thumbnailUploadResult.path;
+
+          if (requestToken !== onhadaManagerUnifiedRequestToken || currentManagedExhibitionId !== processingExhibitionId) {
+            if (newlyUploadedVideoPath) await onhadaManagerUnifiedRemoveVideoSilently(newlyUploadedVideoPath);
+            await onhadaManagerUnifiedRemoveThumbnailSilently(newlyUploadedThumbnailPath);
+            return;
+          }
+
+          thumbnailPathForPayload = newlyUploadedThumbnailPath;
+        } else {
+          // 썸네일 유지
+          thumbnailPathForPayload = onhadaManagerUnifiedEditOriginalThumbnailUrl;
+        }
+
+        if (statusEl) statusEl.textContent = '수정 내용을 승인 대기 상태로 저장하는 중입니다.';
+
+        const updateInput = {
+          title: title,
+          artist_display_name: author,
+          category_id: categoryId,
+          description: description,
+          consent_confirmed: true,
+          media_path: mediaPathForPayload,
+          thumbnail_path: thumbnailPathForPayload,
+          external_url: externalUrlForPayload
+        };
+
+        // 3. update_own_video_artwork 호출
+        let updateResult;
+        try {
+          updateResult = await window.ONHADA_BACKEND.db.updateOwnVideoArtworkAsManager(processingExhibitionId, artworkId, updateInput);
+        } catch (err) {
+          updateResult = { ok: false, cleanup: null, error: { code: 'unexpected_error', message: '작품 수정 중 오류가 발생했습니다.' } };
+        }
+
+        const newlyUploadedPaths = [newlyUploadedVideoPath, newlyUploadedThumbnailPath].filter(function (p) { return !!p; });
+
+        if (requestToken !== onhadaManagerUnifiedRequestToken) {
+          // stale - 성공했다면 반환된 이전 경로를 정리만 하고(새 경로 제외),
+          // 화면 상태는 건드리지 않는다. previousExternalUrl은 Storage 대상이
+          // 아니므로 여기서도 참조하지 않는다.
+          if (updateResult.ok && updateResult.cleanup) {
+            await onhadaManagerUnifiedCleanupPaths(
+              [updateResult.cleanup.previousMediaUrl, updateResult.cleanup.previousThumbnailUrl],
+              newlyUploadedPaths
+            );
+          } else if (newlyUploadedPaths.length > 0) {
+            await onhadaManagerUnifiedCleanupPaths(newlyUploadedPaths, []);
+          }
+          return;
+        }
+
+        if (!updateResult.ok) {
+          // 4. RPC 실패 - 이번에 새로 올린 자산만 보상 삭제(기존 자산은 DB가 여전히 가리키므로 보존)
+          if (newlyUploadedPaths.length > 0) {
+            await onhadaManagerUnifiedCleanupPaths(newlyUploadedPaths, []);
+          }
+          if (currentManagedExhibitionId === processingExhibitionId) {
+            if (statusEl) statusEl.textContent = (updateResult.error && updateResult.error.message) || '작품 수정에 실패했습니다.';
+          }
+          return;
+        }
+
+        // 5. RPC 성공 - 이전 미사용 자산 정리(새 경로와 같은 값은 제외, 중복 제거).
+        let cleanupOk = true;
+        if (updateResult.cleanup) {
+          cleanupOk = await onhadaManagerUnifiedCleanupPaths(
+            [updateResult.cleanup.previousMediaUrl, updateResult.cleanup.previousThumbnailUrl],
+            newlyUploadedPaths
+          );
+        }
+
+        if (currentManagedExhibitionId === processingExhibitionId) {
+          // 6. 위저드 초기화 + 목록 재조회
+          onhadaResetManagerUnifiedState();
+          onhadaRenderManagerUnifiedStep();
+          const freshStatusEl = document.getElementById('onhada-manager-unified-status');
+          if (freshStatusEl) {
+            freshStatusEl.textContent = cleanupOk
+              ? '작품이 수정되어 승인 대기 상태로 전환되었습니다.'
+              : '작품은 수정되었지만 이전 파일 정리가 완료되지 않았습니다.';
+          }
+          renderManagedArtworks(processingExhibitionId);
+        }
+      } finally {
+        onhadaManagerUnifiedSubmitting = false;
+        const finalPrevBtn = document.getElementById('onhada-manager-unified-prev-btn');
+        const finalNextBtn = document.getElementById('onhada-manager-unified-next-btn');
+        if (finalPrevBtn) finalPrevBtn.disabled = false;
+        if (finalNextBtn) finalNextBtn.disabled = false;
+      }
+    }
+
     // manager 작품 목록의 "내 작품 승인" 버튼 클릭 진입점.
     async function onhadaApproveOwnArtwork(index) {
       if (onhadaManagerUnifiedSubmitting || onhadaManagerActionInProgress) return;
@@ -8717,8 +9082,8 @@
       // 3. 본인 작품 재확인
       if (art.submitted_by !== currentOperatorContext.userId) return;
 
-      // 4. image/document 확인
-      if (['image', 'document'].indexOf(art.media_type) === -1) return;
+      // 4. image/document/video 확인
+      if (['image', 'document', 'video'].indexOf(art.media_type) === -1) return;
 
       // 5. status==='pending' 확인
       if (art.status !== 'pending') return;
@@ -8779,15 +9144,16 @@
       if (!art) return;
 
       if (art.submitted_by !== currentOperatorContext.userId) return;
-      if (['image', 'document'].indexOf(art.media_type) === -1) return;
+      if (['image', 'document', 'video'].indexOf(art.media_type) === -1) return;
       if (['pending', 'rejected'].indexOf(art.status) === -1) return;
       if (art.exhibition_id !== currentManagedExhibitionId) return;
 
       const artworkId = art.id;
       const artworkTitle = (typeof art.title === 'string' && art.title) ? art.title : '(제목 없음)';
+      const deleteNoticePrefix = art.media_type === 'video' ? '영상 ' : '';
 
       const confirmed = await onhadaConfirmAction(
-        '"' + artworkTitle + '" 작품을 삭제하면 복구할 수 없습니다. 작품 정보와 업로드 파일을 영구 삭제하시겠습니까?',
+        '"' + artworkTitle + '" ' + deleteNoticePrefix + '작품을 삭제하면 복구할 수 없습니다. 작품 정보와 업로드 파일을 영구 삭제하시겠습니까?',
         { title: '작품 영구 삭제', confirmLabel: '영구 삭제', cancelLabel: '취소', danger: true }
       );
       if (!confirmed) return;
@@ -8921,14 +9287,16 @@
         dateEl.textContent = onhadaFormatDate(art.created_at);
         row.appendChild(dateEl);
 
-        // 본인이 등록한 image/document 작품에만 수정·자가승인·영구삭제
+        // 본인이 등록한 image/document/video 작품에만 수정·자가승인·영구삭제
         // 컨트롤을 붙인다. art.submitted_by/art.id는 비교·클로저 캡처(index)
         // 용도로만 쓰고 어떤 DOM 속성(onclick 문자열, dataset, option value 등)
-        // 에도 직접 넣지 않는다.
+        // 에도 직접 넣지 않는다. 버튼을 보이게 하는 것은 UX일 뿐이고, 실제
+        // 권한은 항상 RPC(update_own_video_artwork/approve_own_artwork/
+        // delete_own_artwork)가 최종 방어선이다.
         const isOwnArtwork = isManagerAuthenticated
           && currentOperatorContext
           && art.submitted_by === currentOperatorContext.userId;
-        const isEligibleMediaType = ['image', 'document'].indexOf(art.media_type) !== -1;
+        const isEligibleMediaType = ['image', 'document', 'video'].indexOf(art.media_type) !== -1;
 
         if (isOwnArtwork && isEligibleMediaType) {
           if (art.status === 'hidden') {

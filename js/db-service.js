@@ -1938,6 +1938,167 @@
         }
     }
 
+    // manager 본인 영상 작품 수정 - 13_enable_manager_video_workflow.sql의
+    // update_own_video_artwork RPC를 호출한다. updateOwnArtworkAsManager와
+    // 동일한 원칙(input을 그대로 스프레드하지 않고 화이트리스트 필드만
+    // 사용, exhibition_id/submitted_by/share_token은 애초에 읽지도 보내지도
+    // 않음)을 따르되, 경로/URL 검증은 createManagedUnifiedArtwork의 video
+    // 분기(직접 업로드/외부 링크 중 정확히 하나, 썸네일 항상 필수)와 동일한
+    // 검증 함수(isValidManagedVideoPath/isValidManagedImagePath/
+    // isValidExternalVideoUrl)를 재사용한다.
+    async function updateOwnVideoArtworkAsManager(exhibitionId, artworkId, input) {
+        const client = getClient();
+        if (!client) {
+            return { ok: false, cleanup: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        // 1. exhibitionId UUID 형식
+        if (!isValidUuid(exhibitionId)) {
+            return { ok: false, cleanup: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        // 2. artworkId UUID 형식
+        if (!isValidUuid(artworkId)) {
+            return { ok: false, cleanup: null, error: safeError('invalid_artwork_id', '작품 정보가 올바르지 않습니다.') };
+        }
+
+        // 3. input 객체 여부
+        if (!input || typeof input !== 'object') {
+            return { ok: false, cleanup: null, error: safeError('invalid_input', '입력값이 올바르지 않습니다.') };
+        }
+
+        // input을 그대로 스프레드하지 않고 화이트리스트 필드만 꺼낸다.
+        const title = typeof input.title === 'string' ? input.title.trim() : '';
+        const artistDisplayName = typeof input.artist_display_name === 'string' ? input.artist_display_name.trim() : '';
+        const categoryId = typeof input.category_id === 'string' ? input.category_id.trim() : '';
+        const descriptionTrimmed = typeof input.description === 'string' ? input.description.trim() : '';
+        const consentConfirmed = input.consent_confirmed === true;
+        const mediaPath = typeof input.media_path === 'string' ? input.media_path : '';
+        const thumbnailPath = typeof input.thumbnail_path === 'string' ? input.thumbnail_path : '';
+        const externalUrl = typeof input.external_url === 'string' ? input.external_url.trim() : '';
+
+        // 4. 작품명
+        if (!title || title.length > 100) {
+            return { ok: false, cleanup: null, error: safeError('invalid_title', '작품명을 100자 이내로 입력해 주세요.') };
+        }
+
+        // 5. 작가 표시명
+        if (!artistDisplayName || artistDisplayName.length > 50) {
+            return { ok: false, cleanup: null, error: safeError('invalid_artist_display_name', '작가 표시명을 50자 이내로 입력해 주세요.') };
+        }
+
+        // 6. 카테고리 (빈 값만 차단, 실제 존재 여부는 RPC 내부에서 재검증)
+        if (!categoryId) {
+            return { ok: false, cleanup: null, error: safeError('invalid_category', '카테고리를 선택해 주세요.') };
+        }
+
+        // 7. 작품 설명 (선택)
+        if (descriptionTrimmed.length > 500) {
+            return { ok: false, cleanup: null, error: safeError('invalid_description', '작품 설명은 500자를 초과할 수 없습니다.') };
+        }
+
+        // 8. 전시 동의
+        if (!consentConfirmed) {
+            return { ok: false, cleanup: null, error: safeError('consent_required', '전시 동의 확인이 필요합니다.') };
+        }
+
+        // 9. 직접 업로드(media_path)와 외부 링크(external_url) 중 정확히 하나만.
+        const hasMediaPath = mediaPath.length > 0;
+        const hasExternalUrl = externalUrl.length > 0;
+
+        if (hasMediaPath && hasExternalUrl) {
+            return { ok: false, cleanup: null, error: safeError('invalid_media_path', '영상은 직접 업로드 또는 외부 링크 중 하나만 등록할 수 있습니다.') };
+        }
+        if (!hasMediaPath && !hasExternalUrl) {
+            return { ok: false, cleanup: null, error: safeError('invalid_media_path', '영상 파일 또는 외부 링크 중 하나는 반드시 등록해야 합니다.') };
+        }
+
+        // 10. 썸네일은 방식과 무관하게 항상 필수 + 같은 전시관 폴더의 이미지 경로.
+        const isThumbnailImagePath = isValidManagedImagePath(thumbnailPath, exhibitionId);
+        if (!isThumbnailImagePath) {
+            return { ok: false, cleanup: null, error: safeError('invalid_thumbnail_path', '썸네일 경로 정보가 올바르지 않습니다.') };
+        }
+
+        let mediaUrlForPayload = null;
+        let externalUrlForPayload = null;
+
+        if (hasMediaPath) {
+            // 11-A. 직접 업로드 - 같은 전시관 폴더의 UUID 기반 .mp4 경로만 허용.
+            if (!isValidManagedVideoPath(mediaPath, exhibitionId)) {
+                return { ok: false, cleanup: null, error: safeError('invalid_media_path', '영상 경로 정보가 올바르지 않습니다.') };
+            }
+            if (mediaPath === thumbnailPath) {
+                return { ok: false, cleanup: null, error: safeError('invalid_media_path', '영상과 썸네일 경로는 서로 달라야 합니다.') };
+            }
+            mediaUrlForPayload = mediaPath;
+        } else {
+            // 11-B. 외부 링크 - 2단계와 동일한 검증기를 그대로 재사용(DNS 조회 없음).
+            if (!isValidExternalVideoUrl(externalUrl)) {
+                return { ok: false, cleanup: null, error: safeError('invalid_external_url', '외부 영상 링크 형식이 올바르지 않습니다.') };
+            }
+            externalUrlForPayload = externalUrl;
+        }
+
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, cleanup: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        // 12. 로그인 상태
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, cleanup: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        // 13. 운영자 계정 확인
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, cleanup: null, error: safeError('role_not_allowed', '작품 수정은 운영자 계정만 가능합니다.') };
+        }
+
+        try {
+            const { data, error } = await client.rpc('update_own_video_artwork', {
+                target_artwork_id: artworkId,
+                p_title: title,
+                p_artist_display_name: artistDisplayName,
+                p_category_id: categoryId,
+                p_description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
+                p_consent_confirmed: true,
+                p_media_url: mediaUrlForPayload,
+                p_thumbnail_url: thumbnailPath,
+                p_external_url: externalUrlForPayload
+            });
+
+            if (error) {
+                return { ok: false, cleanup: null, error: safeError('artwork_update_failed', error.message || '작품 수정에 실패했습니다.') };
+            }
+
+            // update_own_video_artwork도 RETURNS TABLE이므로 data는 배열이다.
+            if (!Array.isArray(data) || data.length !== 1) {
+                return { ok: false, cleanup: null, error: safeError('artwork_update_failed', '작품 수정에 실패했습니다.') };
+            }
+
+            const row = data[0];
+
+            // previousMediaUrl/previousThumbnailUrl/previousExternalUrl은 다음
+            // 단계(app.html)의 Storage 보상 정리 전용 내부 데이터다. DOM/
+            // console/사용자 메시지에 절대 출력하지 않는다. previousExternalUrl은
+            // Storage 경로가 아니므로(외부 원본 영상은 삭제 대상이 아님) 호출부가
+            // Storage 삭제 목록에 절대 포함시키지 않아야 한다.
+            return {
+                ok: true,
+                cleanup: {
+                    previousMediaUrl: typeof row.previous_media_url === 'string' ? row.previous_media_url : null,
+                    previousThumbnailUrl: typeof row.previous_thumbnail_url === 'string' ? row.previous_thumbnail_url : null,
+                    previousExternalUrl: typeof row.previous_external_url === 'string' ? row.previous_external_url : null
+                },
+                error: null
+            };
+        } catch (err) {
+            return { ok: false, cleanup: null, error: safeError('unexpected_error', '작품 수정 중 오류가 발생했습니다.') };
+        }
+    }
+
     // manager 본인 작품 자가 승인 - approve_own_artwork RPC를 호출한다.
     async function approveOwnArtworkAsManager(artworkId) {
         if (!isValidUuid(artworkId)) {
@@ -2022,7 +2183,7 @@
             const row = data[0];
             const mediaType = typeof row.removed_media_type === 'string' ? row.removed_media_type : '';
 
-            if (['image', 'document'].indexOf(mediaType) === -1) {
+            if (['image', 'document', 'video'].indexOf(mediaType) === -1) {
                 return { ok: false, cleanup: null, error: safeError('artwork_delete_failed', '작품 삭제에 실패했습니다.') };
             }
 
@@ -2030,6 +2191,9 @@
             const thumbnailUrl = row.removed_thumbnail_url === null ? null : (typeof row.removed_thumbnail_url === 'string' ? row.removed_thumbnail_url : undefined);
 
             // 반환 경로는 null 또는 문자열만 허용한다. 그 외 타입이면 안전 실패로 처리한다.
+            // video는 외부 링크였다면 removed_media_url이 정상적으로 null일 수
+            // 있다(원본 media_url 자체가 NULL이었으므로) - image/document처럼
+            // media_url이 항상 문자열이어야 한다고 가정하지 않는다.
             if (mediaUrl === undefined || thumbnailUrl === undefined) {
                 return { ok: false, cleanup: null, error: safeError('artwork_delete_failed', '작품 삭제에 실패했습니다.') };
             }
@@ -2186,6 +2350,7 @@
         getExhibitionManagers: getExhibitionManagers,
         unassignExhibitionManager: unassignExhibitionManager,
         updateOwnArtworkAsManager: updateOwnArtworkAsManager,
+        updateOwnVideoArtworkAsManager: updateOwnVideoArtworkAsManager,
         approveOwnArtworkAsManager: approveOwnArtworkAsManager,
         deleteOwnArtworkAsManager: deleteOwnArtworkAsManager,
         setExhibitionPublicationAsAdmin: setExhibitionPublicationAsAdmin
