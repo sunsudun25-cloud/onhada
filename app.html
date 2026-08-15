@@ -1747,6 +1747,12 @@
         padding-bottom: 6px;
         gap: 20px;
         scrollbar-width: none; /* Firefox */
+        /* 스크롤바를 숨기는 대신, 오른쪽 끝을 페이드 처리해 "더 스크롤할
+           메뉴가 있다"는 것을 시각적으로 암시한다(스크롤 기능 자체는
+           기존 overflow-x:auto 그대로, JS는 전혀 건드리지 않음). body
+           가로 스크롤에는 영향 없음(이 요소 내부에서만 overflow 발생). */
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+        mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
       }
       .nav-links::-webkit-scrollbar {
         display: none; /* Chrome, Safari */
@@ -2401,8 +2407,10 @@
           <button class="sub-tab-btn" onclick="filterBrowseCategory('personal', this)">작가별 1인 전시관</button>
         </div>
 
-        <!-- 전시관 카드 그리드 (최소 6개 이상 렌더링) -->
-        <div class="halls-grid" id="browse-halls-grid-container">
+        <!-- 전시관 카드 목록: 현재 운영 중 / 강사 실증 / 시연용 데모 3섹션.
+             이 wrapper 자체는 더 이상 grid가 아니다 - 각 섹션 내부의
+             .halls-grid 자식 div가 개별적으로 grid를 적용한다. -->
+        <div id="browse-halls-grid-container">
           <!-- JS 동적 로드 -->
         </div>
         
@@ -3738,6 +3746,7 @@
         "art": "어르신들이 손수 그린 AI 그림책관입니다.\n푸른 바다의 감동을 느껴보세요.",
         "museum": "어르신의 인생 가사가 노래가 되는 음악관입니다.\n추억의 포크송을 들어보세요.",
         "dicasi": "직접 폰으로 촬영한 봄날의 사진 시집관입니다.\n삶의 따뜻한 사색을 함께 나눕니다.",
+        "onart-gallery": "AI로 그려낸 상상과 빛의 작품을 만나는 디지털 아트 전시관입니다.",
         "silver-wings": "백세 청춘의 창작 AI 현대 미술관입니다.\n생생한 오일 페인팅 화풍을 감상하세요.",
         "blue-youth": "동네 풍경과 시를 엮은 서정 사진관입니다.\n마음의 고향 같은 잔잔한 향수가 있습니다.",
         "memory-melody": "손수 지은 작사와 선율이 만난 영상관입니다.\n트로트 가락에 맞춰 절로 흥이 납니다.",
@@ -3985,7 +3994,16 @@
       { id: "art", title: "상상의 바다 갤러리", center: "중구 평생학습관", tag: "AI 그림책", img: "상상의바다_갤러리.png", count: 24, authors: 8, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://on-sea-gallery.lovable.app" },
       { id: "museum", title: "빛의 사운드 뮤지엄", center: "동래구 노인복지관", tag: "회상곡 영상", img: "온뮤지엄 상세.png", count: 12, authors: 6, isRecomm: true, isRecent: false, isPersonal: false, externalUrl: "https://onmuseum.lovable.app" },
       { id: "dicasi", title: "디카시정원", center: "연산6동 평생학습원", tag: "사진 & 시", img: "디카시정원_갤러리.png", count: 18, authors: 10, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://dikasi-garden.lovable.app" },
-      { id: "silver-wings", title: "은빛 나래 미술관", center: "금정구 노인복지관", tag: "AI 이미지", img: "온아트상세.png", count: 30, authors: 12, isRecomm: true, isRecent: false, isPersonal: false, externalUrl: "https://onartgallery.lovable.app" },
+      // 실시간으로 확인되지 않은 참여작가/등록작품 수를 임의로 만들지
+      // 않기 위해 count/authors를 의도적으로 넣지 않는다(카드 렌더 시
+      // Number.isFinite 검사로 "작품 감상 가능" 안전 문구로 대체된다).
+      { id: "onart-gallery", title: "상상의 빛 갤러리", center: "", tag: "AI 이미지", img: "온아트상세.png", isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://onartgallery.lovable.app" },
+      // externalUrl 없음(의도적) - 과거 실제 "상상의 빛 갤러리" URL과
+      // 잘못 연결돼 있던 값을 제거했다. 이 카드는 시연용 데모이며,
+      // enterSpecificHall()의 externalUrl truthy 체크에 의해 자동으로
+      // 기존 로컬 데모 전시관 화면(내부 platformData 작품 목록)으로
+      // 진입한다 - 다른 로컬 데모 전시관(blue-youth 등)과 동일한 방식.
+      { id: "silver-wings", title: "은빛 나래 미술관", center: "금정구 노인복지관", tag: "AI 이미지", img: "온아트상세.png", count: 30, authors: 12, isRecomm: true, isRecent: false, isPersonal: false },
       { id: "blue-youth", title: "푸른 청춘 문학실", center: "사하구 도서관", tag: "사진 & 시", img: "디카시 상세페이지.png", count: 15, authors: 5, isRecomm: false, isRecent: true, isPersonal: false },
       { id: "memory-melody", title: "추억의 멜로디 홀", center: "수영구 평생학습관", tag: "회상곡 영상", img: "온뮤지엄 상세.png", count: 14, authors: 7, isRecomm: false, isRecent: true, isPersonal: false },
       { id: "busan-history", title: "부산의 옛 기억전", center: "동구 노인복지관", tag: "실증 아카이브", img: "온라인 전시장 .png", count: 20, authors: 11, isRecomm: true, isRecent: true, isPersonal: false },
@@ -4004,6 +4022,50 @@
 
     let platformData = [];
     let platformHalls = [];
+
+    // 전시관 둘러보기 3섹션(실제 운영/강사 실증/시연용 데모) 분류 기준을
+    // 이 한 곳에서만 관리한다. 화면 제목 문자열 비교가 아니라 안정적인
+    // id(로컬)와 exhibition_type(Supabase)만 사용한다.
+    const REAL_OPERATING_HALL_IDS = new Set(["art", "museum", "dicasi", "onart-gallery"]);
+
+    const HALL_SECTION_META = {
+      real: {
+        heading: "현재 운영 중인 전시관",
+        description: "기관과 참여자들의 실제 창작 작품을 만나보세요.",
+        badgeText: "현재 운영 중",
+        badgeStyle: "background: rgba(46, 204, 113, 0.15); border: 1px solid #2ecc71; color: #2ecc71; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;"
+      },
+      instructor: {
+        heading: "강사 실증 전시관",
+        description: "강사들이 작품 등록과 전시 운영 기능을 직접 활용하고 있습니다.",
+        badgeText: "강사 실증",
+        badgeStyle: "background: rgba(52, 152, 219, 0.15); border: 1px solid #3498db; color: #3498db; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;"
+      },
+      demo: {
+        heading: "시연용 데모 전시관",
+        description: "ON하다의 다양한 전시 형태를 미리 살펴보는 예시 공간입니다.",
+        badgeText: "시연용 데모",
+        badgeStyle: "background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;"
+      }
+    };
+
+    // hall.source==='supabase'이면 exhibition_type==='instructor'만 강사
+    // 실증으로, 그 외(=is_demo 값과 무관하게)는 데모로 분류한다. 로컬
+    // 카드는 REAL_OPERATING_HALL_IDS에 있는 id만 실제 운영, 나머지는
+    // 전부 데모(1인 전시관 포함)로 분류한다.
+    function onhadaGetHallSectionGroup(hall) {
+      if (hall.source === 'supabase') {
+        return hall.exhibitionType === 'instructor' ? 'instructor' : 'demo';
+      }
+      return REAL_OPERATING_HALL_IDS.has(hall.id) ? 'real' : 'demo';
+    }
+
+    // trailing slash/대소문자 차이만으로 같은 외부 URL을 다른 값으로
+    // 오판하지 않도록 비교 전에 정규화한다(예: ".../onartgallery" vs
+    // ".../onartgallery/").
+    function onhadaNormalizeExternalUrl(url) {
+      return (typeof url === 'string' ? url : '').trim().replace(/\/+$/, '').toLowerCase();
+    }
 
     function initMockDatabase() {
       try {
@@ -4025,6 +4087,56 @@
         
         platformData = JSON.parse(works);
         platformHalls = JSON.parse(halls);
+
+        // 이번 배포에서 필요한 마이그레이션은 정확히 두 가지뿐이다.
+        // (1) silver-wings(은빛 나래 미술관)에 과거 잘못 연결됐던 실제
+        //     "상상의 빛 갤러리" URL을 제거한다(id와 URL이 둘 다 정확히
+        //     일치할 때만 - 사용자가 직접 다른 URL로 바꿔 둔 캐시는
+        //     절대 건드리지 않는다).
+        // (2) 신규 실제 전시관 onart-gallery가 없으면 추가한다.
+        // INITIAL_HALLS 전체를 순회해 누락된 항목을 모두 복원하는
+        // 방식은 쓰지 않는다 - 이번에 다루지 않는 다른 항목까지(예:
+        // 향후 사용자가 로컬에서 지운 데모 카드) 의도치 않게 되살아날
+        // 수 있기 때문이다. 두 단계 모두 멱등이며 하나의 hallsChanged
+        // 플래그로 묶어 변경이 있을 때만 한 번 저장한다.
+        let hallsChanged = false;
+
+        // (1) silver-wings 잘못된 URL 제거. delete로 해당 속성만 지우고
+        // id/제목/설명/img/작품/작가/isPersonal 등 다른 필드는 전혀
+        // 건드리지 않는다.
+        const WRONG_SILVER_WINGS_URL = onhadaNormalizeExternalUrl('https://onartgallery.lovable.app');
+        const silverWingsHall = platformHalls.find(function (h) { return h.id === 'silver-wings'; });
+        if (silverWingsHall && onhadaNormalizeExternalUrl(silverWingsHall.externalUrl) === WRONG_SILVER_WINGS_URL) {
+          delete silverWingsHall.externalUrl;
+          hallsChanged = true;
+        }
+
+        // (2) 신규 실제 전시관 onart-gallery 추가. id가 이미 있거나
+        // "실제 운영"으로 분류되는 다른 카드가 이미 같은 externalUrl
+        // (trailing slash 차이 포함)을 쓰고 있으면 추가하지 않는다.
+        // 데모로 분류된 카드(예: 방금 URL을 지운 silver-wings, 또는
+        // silver-wings가 아닌 다른 카드가 우연히 같은 URL을 쓰는 경우)는
+        // 이 판단에서 제외한다 - 그래야 (1)의 처리 순서와 무관하게, 그리고
+        // 무관한 데모 카드의 URL 때문에 신규 실제 카드 추가 자체가
+        // 막히지 않는다. 기존 카드의 id/제목/설명/통계/externalUrl은
+        // 무엇이든 절대 덮어쓰지 않는다 - 새로 추가하지 않을 뿐이다.
+        const onartGalleryHall = INITIAL_HALLS.find(function (h) { return h.id === 'onart-gallery'; });
+        if (onartGalleryHall) {
+          const normalizedNewUrl = onhadaNormalizeExternalUrl(onartGalleryHall.externalUrl);
+          const alreadyExists = platformHalls.some(function (h) {
+            if (h.id === onartGalleryHall.id) return true;
+            if (!REAL_OPERATING_HALL_IDS.has(h.id)) return false;
+            return onhadaNormalizeExternalUrl(h.externalUrl) === normalizedNewUrl;
+          });
+          if (!alreadyExists) {
+            platformHalls.push(Object.assign({}, onartGalleryHall));
+            hallsChanged = true;
+          }
+        }
+
+        if (hallsChanged) {
+          localStorage.setItem('onhada_halls_db', JSON.stringify(platformHalls));
+        }
       } catch (e) {
         console.error("Local Storage reset due to corruption:", e);
         platformData = INITIAL_WORKS;
@@ -4374,7 +4486,243 @@
       return label + ' ' + value + unit;
     }
 
-    // [전시관 둘러보기] 카드 6개 이상 동적 로딩 및 필터링
+    // 데모로 분류된 카드는 실제 전시 이미지(hall.img)를 렌더링에 전혀
+    // 쓰지 않는다 - Supabase cover 다운로드도 시도하지 않고, 로컬 카드도
+    // 실제 <img>를 그리지 않는다. 대신 유형별(institution/instructor/
+    // personal) 기존 CSS fallback 비주얼에 "시연용 데모" 캡션 한 줄만
+    // 덧붙인다. 이 함수는 fallback div만 만들어 반환하고, 실제
+    // hall-img-box에 붙이는 것은 호출부가 한다.
+    function onhadaBuildDemoFallbackEl(typeLabel) {
+      const fallback = document.createElement('div');
+      fallback.className = 'hall-card-thumb-fallback hall-entrance-visual-label';
+      fallback.style.cssText = 'flex-direction: column; gap: 6px;';
+
+      const typeSpan = document.createElement('span');
+      typeSpan.textContent = typeLabel;
+      fallback.appendChild(typeSpan);
+
+      const demoCaption = document.createElement('span');
+      demoCaption.textContent = '시연용 데모';
+      demoCaption.style.cssText = 'font-size: 0.7rem; font-weight: 700; opacity: 0.65; letter-spacing: 0.5px;';
+      fallback.appendChild(demoCaption);
+
+      return fallback;
+    }
+
+    // Supabase 소스 카드(강사 실증/데모 공통) 빌더. group이 'demo'이면
+    // hall.img가 있어도 절대 다운로드하지 않고 CSS fallback + "시연용
+    // 데모" 캡션만 쓴다 - 실제 대표 이미지가 데모 취급 카드에 노출되는
+    // 것을 원천 차단한다. DB 문자열은 createElement/textContent로만
+    // 넣는다(innerHTML 금지, 기존 원칙 그대로 유지).
+    function onhadaBuildSupabaseHallCardEl(hall, group) {
+      const meta = HALL_SECTION_META[group];
+
+      const card = document.createElement('div');
+      card.className = 'hall-card';
+
+      const imgBox = document.createElement('div');
+      imgBox.className = 'hall-img-box';
+      const themeClass = onhadaGetHallEntranceThemeClass(hall.exhibitionType);
+      if (themeClass) imgBox.classList.add(themeClass);
+
+      let fallback;
+      if (group === 'demo') {
+        fallback = onhadaBuildDemoFallbackEl(onhadaGetHallEntranceTypeLabel(hall.exhibitionType));
+      } else {
+        fallback = document.createElement('div');
+        fallback.className = 'hall-card-thumb-fallback hall-entrance-visual-label';
+        fallback.textContent = onhadaGetHallEntranceTypeLabel(hall.exhibitionType);
+      }
+      imgBox.appendChild(fallback);
+      imgBox.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
+      card.appendChild(imgBox);
+
+      if (hall.img && group !== 'demo') {
+        // 늦게 끝나는 다운로드가 그 사이 다시 그려진(재렌더/재검색) 다른
+        // 카드에 잘못 적용되지 않도록, 완료 시점에 이 전시관 id로 DOM을
+        // 다시 조회한다(캡처한 imgBox 참조를 그대로 쓰지 않는다).
+        imgBox.setAttribute('data-exhibition-cover-id', hall.supabaseExhibitionId);
+        onhadaRenderBrowseHallCoverImage(hall.supabaseExhibitionId, hall.img, imgBox, fallback);
+      }
+
+      const infoBox = document.createElement('div');
+      infoBox.className = 'hall-info-box';
+
+      const badgeRow = document.createElement('div');
+      badgeRow.className = 'hall-badge-row';
+      badgeRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;";
+
+      const leftGroup = document.createElement('div');
+      leftGroup.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'hall-type-tag';
+      tagSpan.style.marginBottom = '0';
+      tagSpan.textContent = hall.tag;
+      leftGroup.appendChild(tagSpan);
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = 'hall-status-badge';
+      statusBadge.style.cssText = meta.badgeStyle;
+      statusBadge.textContent = meta.badgeText;
+      leftGroup.appendChild(statusBadge);
+
+      badgeRow.appendChild(leftGroup);
+
+      const centerSpan = document.createElement('span');
+      centerSpan.style.cssText = "font-size:0.8rem; color:#aaa; font-weight:600;";
+      centerSpan.textContent = hall.center;
+      badgeRow.appendChild(centerSpan);
+
+      infoBox.appendChild(badgeRow);
+
+      const titleEl = document.createElement('h4');
+      titleEl.textContent = hall.title;
+      titleEl.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
+      infoBox.appendChild(titleEl);
+
+      const metaInfo = document.createElement('div');
+      metaInfo.className = 'hall-meta-info';
+      metaInfo.style.cssText = "border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;";
+
+      const authorsSpan = document.createElement('span');
+      authorsSpan.textContent = onhadaFormatHallStatsLabel('참여 작가', hall.authors, '명', hall.statsState);
+      metaInfo.appendChild(authorsSpan);
+
+      const countSpan = document.createElement('span');
+      countSpan.textContent = onhadaFormatHallStatsLabel('등록 작품', hall.count, '점', hall.statsState);
+      metaInfo.appendChild(countSpan);
+
+      infoBox.appendChild(metaInfo);
+
+      // 신규 Supabase 전시관은 실제 UUID(hall.supabaseExhibitionId)를
+      // enterSupabaseExhibition()에 전달한다. 기존 enterSpecificHall(id)와
+      // 완전히 분리된 경로이며, DB 문자열을 onclick 문자열에 직접
+      // 삽입하지 않고 addEventListener 클로저로만 전달한다.
+      const enterBtn = document.createElement('button');
+      enterBtn.className = 'btn-enter-hall';
+      enterBtn.style.width = '100%';
+      enterBtn.textContent = '전시관 입장하기 →';
+      enterBtn.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
+      infoBox.appendChild(enterBtn);
+
+      card.appendChild(infoBox);
+      return card;
+    }
+
+    // 로컬 카드(platformHalls, 외부 Lovable 전시관 4개 포함) 빌더.
+    // group이 'demo'이면 hall.img(실제 정적 이미지 파일)를 절대 쓰지
+    // 않고 유형별 CSS fallback + "시연용 데모" 캡션으로 대체한다.
+    // 그 외(group==='real')는 기존과 동일하게 실제 <img>를 그린다.
+    function onhadaBuildLocalHallCardEl(hall, group) {
+      const meta = HALL_SECTION_META[group];
+
+      // 참여작가/등록작품 수가 확인되지 않은(=count/authors를 아예 넣지
+      // 않은) 카드는 숫자를 임의로 만들지 않고 안전한 문구만 보여준다.
+      // 기존 카드는 전부 유한한 숫자를 갖고 있어 이 분기의 영향을 받지
+      // 않는다.
+      let metaHtml = "";
+      let btnText = "";
+      if (hall.isPersonal) {
+        metaHtml = `
+          <div class="hall-meta-info" style="flex-direction: column; gap: 5px; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;">
+            <span style="font-size: 0.85rem; color: #ddd;">소속: <strong>${hall.center}</strong></span>
+            <span style="font-size: 0.85rem; color: #ddd;">등록 작품: <strong>${hall.count}점</strong> (${hall.composition})</span>
+          </div>
+        `;
+        btnText = "1인 전시관 보기 &rarr;";
+      } else if (Number.isFinite(hall.authors) && Number.isFinite(hall.count)) {
+        metaHtml = `
+          <div class="hall-meta-info" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;">
+            <span>참여 작가 <strong>${hall.authors}명</strong></span>
+            <span>등록 작품 <strong>${hall.count}점</strong></span>
+          </div>
+        `;
+        btnText = "전시관 입장하기 &rarr;";
+      } else {
+        metaHtml = `
+          <div class="hall-meta-info" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;">
+            <span>작품 감상 가능</span>
+          </div>
+        `;
+        btnText = "전시관 입장하기 &rarr;";
+      }
+
+      const badgeHtml = `<span class="hall-status-badge" style="${meta.badgeStyle}">${meta.badgeText}</span>`;
+
+      let imgBoxHtml;
+      if (group === 'demo') {
+        const themeClass = hall.isPersonal ? 'hall-entrance-theme-personal' : 'hall-entrance-theme-institution';
+        const typeLabel = hall.isPersonal ? ONHADA_EXHIBITION_TYPE_PREFIX.personal : ONHADA_EXHIBITION_TYPE_PREFIX.institution;
+        imgBoxHtml = `
+          <div class="hall-img-box ${themeClass}" onclick="enterSpecificHall('${hall.id}')">
+            <div class="hall-card-thumb-fallback hall-entrance-visual-label" style="flex-direction: column; gap: 6px;">
+              <span>${typeLabel}</span>
+              <span style="font-size: 0.7rem; font-weight: 700; opacity: 0.65; letter-spacing: 0.5px;">시연용 데모</span>
+            </div>
+          </div>
+        `;
+      } else {
+        imgBoxHtml = `
+          <div class="hall-img-box" onclick="enterSpecificHall('${hall.id}')">
+            <img src="${hall.img}" alt="${hall.title}">
+          </div>
+        `;
+      }
+
+      const localCardWrapper = document.createElement('div');
+      localCardWrapper.innerHTML = `
+        <div class="hall-card">
+          ${imgBoxHtml}
+          <div class="hall-info-box">
+            <div class="hall-badge-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="hall-type-tag" style="margin-bottom:0;">${hall.tag}</span>
+                ${badgeHtml}
+              </div>
+              <span style="font-size:0.8rem; color:#aaa; font-weight:600;">${hall.center}</span>
+            </div>
+            <h4 onclick="enterSpecificHall('${hall.id}')">${hall.title}</h4>
+            <p class="hall-desc">${getShortDesc(hall.id)}</p>
+            ${metaHtml}
+            <button class="btn-enter-hall" onclick="enterSpecificHall('${hall.id}')">${btnText}</button>
+          </div>
+        </div>
+      `;
+      return localCardWrapper.firstElementChild;
+    }
+
+    // 섹션 1개(제목+설명+grid)의 뼈대만 만들어 반환한다. 카드는 호출부가
+    // 반환된 gridEl에 직접 append한다.
+    function onhadaBuildHallSectionBlock(meta) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'hall-section-block';
+      wrapper.style.marginBottom = '44px';
+
+      const header = document.createElement('div');
+      header.style.cssText = 'margin-bottom: 18px;';
+
+      const heading = document.createElement('h3');
+      heading.textContent = meta.heading;
+      heading.style.cssText = 'color:#fff; font-size:1.5rem; font-weight:900; margin-bottom:6px; letter-spacing:-0.3px;';
+      header.appendChild(heading);
+
+      const desc = document.createElement('p');
+      desc.textContent = meta.description;
+      desc.style.cssText = 'color: var(--text-gray); font-size:1rem;';
+      header.appendChild(desc);
+
+      wrapper.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'halls-grid';
+      wrapper.appendChild(grid);
+
+      return { wrapperEl: wrapper, gridEl: grid };
+    }
+
+    // [전시관 둘러보기] 카드 6개 이상 동적 로딩 및 필터링(실제 운영/강사
+    // 실증/시연용 데모 3섹션으로 그룹핑해 렌더링한다)
     function renderBrowseHalls(searchQuery = "") {
       const container = document.getElementById('browse-halls-grid-container');
       if (!container) return;
@@ -4391,7 +4739,7 @@
         } else if (selectedBrowseCategory === 'personal') {
           if (!hall.isPersonal) return false;
         }
-        
+
         // 검색어 필터
         if (searchQuery) {
           const q = searchQuery.toLowerCase().trim();
@@ -4408,161 +4756,30 @@
         return;
       }
 
+      // 실제 운영/강사 실증/시연용 데모 3그룹으로 나눈다. 순서는 항상
+      // real → instructor → demo 고정이며, 결과가 0개인 섹션은 제목·
+      // 설명·grid까지 통째로 만들지 않는다(숨김이 아니라 애초에 DOM에
+      // 넣지 않는다).
+      const groups = { real: [], instructor: [], demo: [] };
       filtered.forEach(hall => {
-        // 신규 내부 Supabase 전시관 카드 - 이번 단계에서는 작품 조회/상세
-        // 화면 연결을 하지 않으므로 클릭 핸들러를 붙이지 않는다. DB 문자열은
-        // createElement/textContent로만 넣는다(innerHTML 금지).
-        if (hall.source === 'supabase') {
-          const card = document.createElement('div');
-          card.className = 'hall-card';
+        groups[onhadaGetHallSectionGroup(hall)].push(hall);
+      });
 
-          const imgBox = document.createElement('div');
-          imgBox.className = 'hall-img-box';
-          // 대표 이미지(cover_image_path)가 있으면 비공개 버킷에서 Blob으로
-          // 받아 표시하고, 없거나 다운로드에 실패하면 항상 유형별 CSS 기본
-          // 썸네일(fallback)로 되돌아간다 - 둘 다 imgBox 안에 함께 두고
-          // display만 토글한다. DB 문자열(경로 등)은 img의 alt/title/화면
-          // 텍스트 어디에도 노출하지 않는다.
-          const themeClass = onhadaGetHallEntranceThemeClass(hall.exhibitionType);
-          if (themeClass) imgBox.classList.add(themeClass);
-          const fallback = document.createElement('div');
-          fallback.className = 'hall-card-thumb-fallback hall-entrance-visual-label';
-          fallback.textContent = onhadaGetHallEntranceTypeLabel(hall.exhibitionType);
-          imgBox.appendChild(fallback);
-          imgBox.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
-          card.appendChild(imgBox);
+      ['real', 'instructor', 'demo'].forEach(groupKey => {
+        const hallsInGroup = groups[groupKey];
+        if (hallsInGroup.length === 0) return;
 
-          if (hall.img) {
-            // 늦게 끝나는 다운로드가 그 사이 다시 그려진(재렌더/재검색) 다른
-            // 카드에 잘못 적용되지 않도록, 완료 시점에 이 전시관 id로 DOM을
-            // 다시 조회한다(캡처한 imgBox 참조를 그대로 쓰지 않는다).
-            imgBox.setAttribute('data-exhibition-cover-id', hall.supabaseExhibitionId);
-            onhadaRenderBrowseHallCoverImage(hall.supabaseExhibitionId, hall.img, imgBox, fallback);
-          }
+        const meta = HALL_SECTION_META[groupKey];
+        const section = onhadaBuildHallSectionBlock(meta);
 
-          const infoBox = document.createElement('div');
-          infoBox.className = 'hall-info-box';
+        hallsInGroup.forEach(hall => {
+          const cardEl = hall.source === 'supabase'
+            ? onhadaBuildSupabaseHallCardEl(hall, groupKey)
+            : onhadaBuildLocalHallCardEl(hall, groupKey);
+          section.gridEl.appendChild(cardEl);
+        });
 
-          const badgeRow = document.createElement('div');
-          badgeRow.className = 'hall-badge-row';
-          badgeRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;";
-
-          const leftGroup = document.createElement('div');
-          leftGroup.style.cssText = "display: flex; align-items: center; gap: 8px;";
-
-          const tagSpan = document.createElement('span');
-          tagSpan.className = 'hall-type-tag';
-          tagSpan.style.marginBottom = '0';
-          tagSpan.textContent = hall.tag;
-          leftGroup.appendChild(tagSpan);
-
-          const statusBadge = document.createElement('span');
-          statusBadge.className = 'hall-status-badge demo';
-          statusBadge.style.cssText = "background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;";
-          statusBadge.textContent = "전시 관람 가능";
-          leftGroup.appendChild(statusBadge);
-
-          badgeRow.appendChild(leftGroup);
-
-          const centerSpan = document.createElement('span');
-          centerSpan.style.cssText = "font-size:0.8rem; color:#aaa; font-weight:600;";
-          centerSpan.textContent = hall.center;
-          badgeRow.appendChild(centerSpan);
-
-          infoBox.appendChild(badgeRow);
-
-          const titleEl = document.createElement('h4');
-          titleEl.textContent = hall.title;
-          titleEl.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
-          infoBox.appendChild(titleEl);
-
-          const metaInfo = document.createElement('div');
-          metaInfo.className = 'hall-meta-info';
-          metaInfo.style.cssText = "border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;";
-
-          const authorsSpan = document.createElement('span');
-          authorsSpan.textContent = onhadaFormatHallStatsLabel('참여 작가', hall.authors, '명', hall.statsState);
-          metaInfo.appendChild(authorsSpan);
-
-          const countSpan = document.createElement('span');
-          countSpan.textContent = onhadaFormatHallStatsLabel('등록 작품', hall.count, '점', hall.statsState);
-          metaInfo.appendChild(countSpan);
-
-          infoBox.appendChild(metaInfo);
-
-          // 신규 Supabase 전시관은 실제 UUID(hall.supabaseExhibitionId)를
-          // enterSupabaseExhibition()에 전달한다. 기존 enterSpecificHall(id)와
-          // 완전히 분리된 경로이며, DB 문자열을 onclick 문자열에 직접
-          // 삽입하지 않고 addEventListener 클로저로만 전달한다.
-          const enterBtn = document.createElement('button');
-          enterBtn.className = 'btn-enter-hall';
-          enterBtn.style.width = '100%';
-          enterBtn.textContent = '전시관 입장하기 →';
-          enterBtn.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
-          infoBox.appendChild(enterBtn);
-
-          card.appendChild(infoBox);
-
-          container.appendChild(card);
-          return;
-        }
-
-        // --- 이하 기존 로컬 카드(외부 Lovable 전시관 4개 포함) 렌더링 -
-        // 템플릿 내용은 기존과 동일하게 유지한다. 다만 Supabase 카드와
-        // 안전하게 섞어 넣기 위해 container.innerHTML += 대신, 별도 wrapper에
-        // 한 번만 innerHTML을 설정한 뒤 그 요소를 appendChild한다
-        // (container.innerHTML +=는 매 반복마다 전체를 재파싱해 이미 넣은
-        // Supabase 카드의 addEventListener를 날려버릴 수 있어 사용하지 않는다).
-        // 1인 개인관과 기관/주제관 메타데이터 레이아웃 및 버튼 텍스트 분기 처리
-        let metaHtml = "";
-        let btnText = "";
-        if (hall.isPersonal) {
-          metaHtml = `
-            <div class="hall-meta-info" style="flex-direction: column; gap: 5px; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;">
-              <span style="font-size: 0.85rem; color: #ddd;">소속: <strong>${hall.center}</strong></span>
-              <span style="font-size: 0.85rem; color: #ddd;">등록 작품: <strong>${hall.count}점</strong> (${hall.composition})</span>
-            </div>
-          `;
-          btnText = "1인 전시관 보기 &rarr;";
-        } else {
-          metaHtml = `
-            <div class="hall-meta-info" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;">
-              <span>참여 작가 <strong>${hall.authors}명</strong></span>
-              <span>등록 작품 <strong>${hall.count}점</strong></span>
-            </div>
-          `;
-          btnText = "전시관 입장하기 &rarr;";
-        }
-
-        let badgeHtml = "";
-        if (hall.id === "art" || hall.id === "museum") {
-          badgeHtml = `<span class="hall-status-badge live" style="background: rgba(46, 204, 113, 0.15); border: 1px solid #2ecc71; color: #2ecc71; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;">현재 운영 중</span>`;
-        } else {
-          badgeHtml = `<span class="hall-status-badge demo" style="background: rgba(120, 120, 120, 0.15); border: 1px solid #787878; color: #aaa; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.2px;">데모 전시관</span>`;
-        }
-
-        const localCardWrapper = document.createElement('div');
-        localCardWrapper.innerHTML = `
-          <div class="hall-card">
-            <div class="hall-img-box" onclick="enterSpecificHall('${hall.id}')">
-              <img src="${hall.img}" alt="${hall.title}">
-            </div>
-            <div class="hall-info-box">
-              <div class="hall-badge-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="hall-type-tag" style="margin-bottom:0;">${hall.tag}</span>
-                  ${badgeHtml}
-                </div>
-                <span style="font-size:0.8rem; color:#aaa; font-weight:600;">${hall.center}</span>
-              </div>
-              <h4 onclick="enterSpecificHall('${hall.id}')">${hall.title}</h4>
-              <p class="hall-desc">${getShortDesc(hall.id)}</p>
-              ${metaHtml}
-              <button class="btn-enter-hall" onclick="enterSpecificHall('${hall.id}')">${btnText}</button>
-            </div>
-          </div>
-        `;
-        container.appendChild(localCardWrapper.firstElementChild);
+        container.appendChild(section.wrapperEl);
       });
     }
 
@@ -5808,14 +6025,21 @@
 
     function closeHallView() {
       document.getElementById('hall-artworks-section').style.display = 'none';
-      document.getElementById('browse-halls-grid-container').style.display = 'grid';
+      // 이 wrapper는 grid가 아니라 3개 섹션을 세로로 쌓는 컨테이너이므로
+      // 'grid'가 아닌 'block'으로 복원한다(내부 각 섹션의 .halls-grid
+      // 자식이 자체적으로 grid를 적용한다).
+      document.getElementById('browse-halls-grid-container').style.display = 'block';
       document.querySelector('.sub-tabs-bar').style.display = 'flex';
       document.querySelector('.search-box-wrapper').style.display = 'block';
 
-      // 전체 필터 리셋
+      // 전체 필터 리셋. 검색어를 먼저 비워야 한다 - filterBrowseCategory가
+      // 그 시점의 검색창 값을 그대로 읽어 렌더링하므로, 순서가 바뀌면
+      // 검색 상태로 들어갔다 나올 때 검색창은 비어 보이지만 목록은 검색
+      // 결과 그대로 남는 기존 버그가 있었다(이번 브랜치의 3섹션 변경과
+      // 무관하게 origin/main에도 있던 문제 - 여기서 순서만 바로잡는다).
+      document.getElementById('gallerySearchInput').value = "";
       const allBtn = document.getElementById('btn-sub-browse-all');
       filterBrowseCategory('all', allBtn);
-      document.getElementById('gallerySearchInput').value = "";
 
       // 입구/작품 wrapper를 다음 진입을 위한 정상 상태로 복원하고, 공개
       // Supabase 관람 상태(요청 시퀀스/활성 전시관 id/blob)를 정리한다.
