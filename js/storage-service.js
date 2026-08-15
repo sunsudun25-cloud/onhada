@@ -400,6 +400,244 @@
     }
 
     // =====================================================================
+    // 전시관 대표 이미지(exhibition-cover-assets 버킷) 전용. 위 작품 이미지
+    // (artwork-assets)와 버킷·용도가 다르지만, 경로 형식({UUID 폴더}/
+    // {UUID 파일명}.jpg|png|webp)과 MIME/용량 제한은 완전히 동일하므로
+    // ALLOWED_MIME_EXT/MAX_FILE_SIZE/isUuidLike/isValidAssetFileName/
+    // isValidAssetPath/extensionForMime/reencodeImage를 그대로 재사용한다
+    // (artwork-assets 정책·경로 규칙을 넓히는 것이 아니라, 순수 클라이언트
+    // 유틸리티 함수만 공유하는 것 - 실제 접근 권한은 15_add_exhibition_
+    // cover_storage.sql의 별도 버킷·정책이 전담한다).
+    //
+    // 업로드/삭제는 강사(자기 담당 전시관만)와 관리자(모든 비외부 전시관)
+    // 둘 다 호출할 수 있다는 점이 작품 이미지 함수(강사 전용)와 다르다.
+    // 강사 경로는 getMyManagedExhibitions()로 소유권을 미리 확인해 더
+    // 친절한 오류 메시지를 주지만, 최종 방어선은 항상 storage.objects
+    // RLS(storage_exhibition_cover_*)다. 관리자 경로는 클라이언트에서
+    // 소유권을 미리 확인할 개념 자체가 없으므로(모든 비외부 전시관이
+    // 대상) 바로 업로드/삭제를 시도하고 RLS(admin 정책)에 최종 판단을
+    // 맡긴다.
+    // =====================================================================
+
+    var EXHIBITION_COVER_BUCKET = 'exhibition-cover-assets';
+
+    function buildExhibitionCoverPath(exhibitionId, mimeType) {
+        if (!isUuidLike(exhibitionId)) return null;
+        var ext = extensionForMime(mimeType);
+        if (!ext) return null;
+        return exhibitionId + '/' + crypto.randomUUID() + '.' + ext;
+    }
+
+    async function uploadExhibitionCoverImage(exhibitionId, file) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, path: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isUuidLike(exhibitionId)) {
+            return { ok: false, path: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        if (!(file instanceof File)) {
+            return { ok: false, path: null, error: safeError('invalid_file', '파일 정보가 올바르지 않습니다.') };
+        }
+
+        var auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        var context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, path: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        var role = context.profile && context.profile.role;
+        if (role !== 'admin' && role !== 'manager') {
+            return { ok: false, path: null, error: safeError('role_not_allowed', '대표 이미지 업로드는 운영자 또는 관리자 계정만 가능합니다.') };
+        }
+
+        if (role === 'manager') {
+            var db = getDb();
+            if (!db || typeof db.getMyManagedExhibitions !== 'function') {
+                return { ok: false, path: null, error: safeError('storage_unavailable', '전시관 조회 서비스를 사용할 수 없습니다.') };
+            }
+
+            var managedResult = await db.getMyManagedExhibitions();
+            if (!managedResult.ok) {
+                return { ok: false, path: null, error: managedResult.error };
+            }
+
+            var isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionId; });
+            if (!isManaged) {
+                return { ok: false, path: null, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+            }
+        }
+        // role === 'admin'이면 클라이언트 쪽 소유권 사전 확인 없이 진행하고,
+        // storage_exhibition_cover_insert_admin RLS가 최종 판단한다.
+
+        if (!Object.prototype.hasOwnProperty.call(ALLOWED_MIME_EXT, file.type)) {
+            return { ok: false, path: null, error: safeError('unsupported_image_type', 'JPEG, PNG, WEBP 형식만 업로드할 수 있습니다.') };
+        }
+
+        if (!(file.size > 0) || file.size > MAX_FILE_SIZE) {
+            return { ok: false, path: null, error: safeError('image_too_large', '이미지 용량은 5MB를 초과할 수 없습니다.') };
+        }
+
+        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '이 브라우저에서는 이미지 업로드를 사용할 수 없습니다.') };
+        }
+
+        var reencoded = await reencodeImage(file);
+        if (!reencoded.ok) {
+            return { ok: false, path: null, error: reencoded.error };
+        }
+
+        var processedBlob = reencoded.blob;
+
+        if (!Object.prototype.hasOwnProperty.call(ALLOWED_MIME_EXT, processedBlob.type)) {
+            return { ok: false, path: null, error: safeError('image_processing_failed', '이미지 처리 결과가 올바르지 않습니다.') };
+        }
+
+        if (!(processedBlob.size > 0) || processedBlob.size > MAX_FILE_SIZE) {
+            return { ok: false, path: null, error: safeError('image_too_large_after_processing', '처리된 이미지 용량이 5MB를 초과합니다.') };
+        }
+
+        // 원본 file.name은 절대 경로 생성에 사용하지 않는다. 경로는 오직
+        // exhibitionId(폴더)와 crypto.randomUUID() + 확장자로만 구성한다.
+        var path = buildExhibitionCoverPath(exhibitionId, processedBlob.type);
+        if (!path) {
+            return { ok: false, path: null, error: safeError('invalid_storage_path', '저장 경로를 생성할 수 없습니다.') };
+        }
+
+        try {
+            var uploadResult = await client.storage
+                .from(EXHIBITION_COVER_BUCKET)
+                .upload(path, processedBlob, {
+                    upsert: false,
+                    contentType: processedBlob.type,
+                    cacheControl: '3600'
+                });
+
+            if (uploadResult.error) {
+                return { ok: false, path: null, error: safeError('upload_failed', '대표 이미지 업로드에 실패했습니다.') };
+            }
+
+            return {
+                ok: true,
+                path: path,
+                mimeType: processedBlob.type,
+                size: processedBlob.size,
+                width: reencoded.width,
+                height: reencoded.height,
+                error: null
+            };
+        } catch (err) {
+            return { ok: false, path: null, error: safeError('upload_failed', '대표 이미지 업로드 중 오류가 발생했습니다.') };
+        }
+    }
+
+    async function removeExhibitionCoverImage(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidAssetPath(path)) {
+            return { ok: false, error: safeError('invalid_storage_path', '삭제할 파일 경로가 올바르지 않습니다.') };
+        }
+
+        var auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, error: safeError('storage_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        var context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        var role = context.profile && context.profile.role;
+        if (role !== 'admin' && role !== 'manager') {
+            return { ok: false, error: safeError('role_not_allowed', '대표 이미지 삭제는 운영자 또는 관리자 계정만 가능합니다.') };
+        }
+
+        if (role === 'manager') {
+            var segments = path.split('/');
+            var exhibitionSegment = segments[0];
+
+            var db = getDb();
+            if (!db || typeof db.getMyManagedExhibitions !== 'function') {
+                return { ok: false, error: safeError('storage_unavailable', '전시관 조회 서비스를 사용할 수 없습니다.') };
+            }
+
+            var managedResult = await db.getMyManagedExhibitions();
+            if (!managedResult.ok) {
+                return { ok: false, error: managedResult.error };
+            }
+
+            var isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionSegment; });
+            if (!isManaged) {
+                return { ok: false, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+            }
+        }
+        // role === 'admin'이면 클라이언트 쪽 소유권 사전 확인 없이 진행하고,
+        // storage_exhibition_cover_delete_admin RLS가 최종 판단한다.
+
+        try {
+            var removeResult = await client.storage.from(EXHIBITION_COVER_BUCKET).remove([path]);
+
+            if (removeResult.error) {
+                return { ok: false, error: safeError('remove_failed', '대표 이미지 삭제에 실패했습니다.') };
+            }
+
+            return { ok: true, error: null };
+        } catch (err) {
+            return { ok: false, error: safeError('remove_failed', '대표 이미지 삭제 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 업로드/삭제와 달리 role 사전 확인을 하지 않는다. admin/manager/anon
+    // 모두 이 함수를 호출할 수 있으며, 실제로 그 경로를 읽을 권한이 있는지는
+    // storage.objects RLS(storage_exhibition_cover_select_*)가 최종
+    // 판단한다. public URL이나 signed URL은 생성하지 않고, 항상
+    // download()로 받은 Blob만 반환한다.
+    async function downloadExhibitionCoverImage(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, blob: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidAssetPath(path)) {
+            return { ok: false, blob: null, error: safeError('invalid_storage_path', '대표 이미지 경로 정보가 올바르지 않습니다.') };
+        }
+
+        try {
+            var downloadResult = await client.storage.from(EXHIBITION_COVER_BUCKET).download(path);
+
+            if (downloadResult.error || !downloadResult.data) {
+                return { ok: false, blob: null, error: safeError('download_failed', '대표 이미지를 불러오지 못했습니다.') };
+            }
+
+            var blob = downloadResult.data;
+
+            if (!Object.prototype.hasOwnProperty.call(ALLOWED_MIME_EXT, blob.type)) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_image', '대표 이미지 형식이 올바르지 않습니다.') };
+            }
+
+            if (!(blob.size > 0) || blob.size > MAX_FILE_SIZE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_image', '대표 이미지 용량이 올바르지 않습니다.') };
+            }
+
+            return { ok: true, blob: blob, mimeType: blob.type, size: blob.size, error: null };
+        } catch (err) {
+            return { ok: false, blob: null, error: safeError('download_failed', '대표 이미지 다운로드 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // =====================================================================
     // PDF 문서(artwork-documents 버킷) 전용 - 위 이미지(artwork-assets) 관련
     // 상수/검증 함수와는 완전히 분리해서 둔다. 기존 ALLOWED_MIME_EXT/
     // isValidAssetPath 등 이미지용 검증기를 느슨하게 확장하지 않는다.
@@ -853,6 +1091,17 @@
         downloadArtworkDocument: downloadArtworkDocument,
         uploadManagedArtworkVideo: uploadManagedArtworkVideo,
         removeManagedArtworkVideo: removeManagedArtworkVideo,
-        downloadArtworkVideo: downloadArtworkVideo
+        downloadArtworkVideo: downloadArtworkVideo,
+        uploadExhibitionCoverImage: uploadExhibitionCoverImage,
+        removeExhibitionCoverImage: removeExhibitionCoverImage,
+        downloadExhibitionCoverImage: downloadExhibitionCoverImage,
+        // removeExhibitionCoverImage/downloadExhibitionCoverImage가 내부적으로
+        // 쓰는 것과 동일한 경로 형식 검사기를 그대로 노출한다(재구현하지
+        // 않음). 호출부(app.html)가 이 신규 전용 버킷 경로 형식이 아닌 값(=
+        // 이 RPC 배포 이전의 과거 형식 cover_image_path 등)에 대해서는
+        // removeExhibitionCoverImage 호출 자체를 생략할지 미리 판단하는
+        // 용도다 - 어차피 removeExhibitionCoverImage도 내부에서 같은 검사로
+        // 거부하지만, 그 경우까지 불필요한 호출을 만들지 않기 위함이다.
+        isValidExhibitionCoverPath: isValidAssetPath
     };
 })();

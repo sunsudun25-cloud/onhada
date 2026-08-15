@@ -3655,6 +3655,60 @@
     </div>
   </div>
 
+  <!-- 전시관 정보 수정(이름/소개/기관명/주제/대표 이미지) - 배정 강사와
+       관리자가 함께 재사용하는 공용 모달. 외부 Lovable 전시관에는 이
+       모달을 여는 버튼 자체를 만들지 않는다(강사 화면/관리자 화면 양쪽
+       모두). 어떤 DB 문자열도 이 마크업에는 없고, JS에서 textContent/
+       value로만 채운다. -->
+  <div class="admin-login-overlay" id="onhada-exhibition-info-edit-modal" role="dialog" aria-modal="true" aria-labelledby="onhada-exhibition-info-edit-title">
+    <div class="admin-login-box" id="onhada-exhibition-info-edit-dialog" style="max-width: 560px; width: 92%; text-align: left; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <h3 id="onhada-exhibition-info-edit-title" style="font-size: 1.3rem; color: #fff;">전시관 정보 수정</h3>
+        <button type="button" class="btn-hero-secondary" id="onhada-exhibition-info-edit-close-x" onclick="onhadaCloseExhibitionInfoEditModal()" style="padding: 4px 12px; font-size: 0.85rem; flex-shrink:0;" aria-label="전시관 정보 수정 닫기">✕</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 18px;">이름·소개·소속 기관명·전시 주제·대표 이미지만 수정할 수 있습니다. 공개 범위·운영 상태·담당자 배정은 이 화면에서 바꿀 수 없습니다.</p>
+
+      <form id="onhada-exhibition-info-edit-form" onsubmit="onhadaSubmitExhibitionInfoEdit(event); return false;">
+        <div class="form-group">
+          <label class="form-label" for="onhada-exhibition-info-edit-title-input">전시관 이름</label>
+          <input type="text" id="onhada-exhibition-info-edit-title-input" class="form-control" maxlength="100" placeholder="전시관 이름을 입력하세요">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="onhada-exhibition-info-edit-description-input">전시관 소개</label>
+          <textarea id="onhada-exhibition-info-edit-description-input" class="form-control" rows="3" maxlength="1000" placeholder="전시관 소개를 입력하세요."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="onhada-exhibition-info-edit-organization-input">소속 기관명</label>
+          <input type="text" id="onhada-exhibition-info-edit-organization-input" class="form-control" maxlength="100" placeholder="예: 연산구노인복지관">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="onhada-exhibition-info-edit-tag-input">전시 주제</label>
+          <input type="text" id="onhada-exhibition-info-edit-tag-input" class="form-control" maxlength="50" placeholder="예: AI 이미지·만화">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" id="onhada-exhibition-info-edit-cover-label">대표 이미지</label>
+
+          <div id="onhada-exhibition-info-edit-cover-preview-box" style="position:relative; width:100%; aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); margin-bottom:10px; display:flex; align-items:center; justify-content:center;">
+            <img id="onhada-exhibition-info-edit-cover-preview-img" alt="" style="display:none; width:100%; height:100%; object-fit:cover;">
+            <span id="onhada-exhibition-info-edit-cover-preview-fallback" style="color:var(--text-gray); font-size:0.85rem;">대표 이미지가 없습니다</span>
+          </div>
+
+          <label for="onhada-exhibition-info-edit-cover-input" class="btn-hero-secondary" style="display:inline-block; font-size:0.85rem; padding:8px 16px; cursor:pointer;">이미지 선택</label>
+          <input type="file" id="onhada-exhibition-info-edit-cover-input" accept="image/jpeg,image/png,image/webp" style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap;" onchange="onhadaHandleExhibitionCoverFileSelect(event)">
+          <button type="button" class="btn-hero-secondary" id="onhada-exhibition-info-edit-cover-remove-btn" onclick="onhadaRequestRemoveExhibitionCover()" style="font-size:0.85rem; padding:8px 16px; margin-left:8px; display:none;">이미지 제거</button>
+
+          <p style="font-size:0.75rem; color:var(--text-gray); margin-top:8px;">JPG·PNG·WEBP, 최대 5MB, 권장 비율 16:9</p>
+          <p id="onhada-exhibition-info-edit-cover-file-status" style="font-size:0.8rem; color:var(--text-gray); margin-top:4px;"></p>
+        </div>
+
+        <button type="submit" class="btn-run-coach" id="onhada-exhibition-info-edit-submit">저장</button>
+        <button type="button" class="btn-hero-secondary" id="onhada-exhibition-info-edit-cancel" onclick="onhadaCloseExhibitionInfoEditModal()" style="width:100%; margin-top:8px;">취소</button>
+        <p id="onhada-exhibition-info-edit-status" aria-live="polite" style="color:var(--text-gray); font-size:0.85rem; margin-top:10px; min-height:1.2em;"></p>
+      </form>
+    </div>
+  </div>
+
   <!-- 알림 경고 팝업 -->
   <div class="alert-dialog-overlay" id="alert-dialog">
     <div class="alert-dialog-box">
@@ -3672,8 +3726,8 @@
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
   <script src="js/supabase-client.js?v=20260811-8"></script>
   <script src="js/auth-service.js?v=20260811-8"></script>
-  <script src="js/db-service.js?v=20260815-1"></script>
-  <script src="js/storage-service.js?v=20260811-8"></script>
+  <script src="js/db-service.js?v=20260815-2"></script>
+  <script src="js/storage-service.js?v=20260815-2"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -4170,11 +4224,95 @@
       return merged;
     }
 
+    // 카드에 대표 이미지를 적용한다. imgBoxEl/fallbackEl이 null이면(카드가
+    // 이미 재렌더나 검색 필터로 사라진 경우) 아무 것도 하지 않는다.
+    function onhadaApplyBrowseHallCoverImage(imgBoxEl, fallbackEl, objectUrl) {
+      if (!imgBoxEl) return;
+      if (fallbackEl) fallbackEl.style.display = 'none';
+      const img = document.createElement('img');
+      img.src = objectUrl;
+      // 장식용 대표 이미지 - 카드 제목이 별도 텍스트로 이미 표시되므로
+      // 대체 텍스트를 비워 스크린리더 중복 낭독을 피한다. 내부 Storage
+      // 경로는 이 img의 어떤 속성에도 넣지 않는다.
+      img.alt = '';
+      img.loading = 'lazy';
+      imgBoxEl.appendChild(img);
+    }
+
+    // onhadaPublicExhibitionsRequestSeq(같은 "세대") 안에서는 같은 전시관의
+    // 대표 이미지를 반복 다운로드하지 않는다 - 캐시에 있으면 즉시 동기
+    // 적용, 없으면 그때 처음 한 번만 비동기 다운로드를 시작한다.
+    function onhadaRenderBrowseHallCoverImage(exhibitionId, path, imgBoxEl, fallbackEl) {
+      const cached = onhadaBrowseHallCoverBlobUrls.get(exhibitionId);
+      if (cached) {
+        onhadaApplyBrowseHallCoverImage(imgBoxEl, fallbackEl, cached);
+        return;
+      }
+
+      // onhadaLoadPublicExhibitions()는 통계 로딩 상태(loading)와 완료 상태
+      // (ready/failed)로 renderBrowseHalls()를 두 번 호출한다 - 통계 응답이
+      // 빠르면 첫 번째 다운로드가 끝나기 전에 두 번째 렌더가 같은 전시관을
+      // 다시 그리며 또 다운로드를 시작할 수 있다. onhadaBrowseHallCoverPendingIds로
+      // "이미 요청 중"인 전시관을 추적해 이 경우에도 실제 네트워크 요청은
+      // 한 번만 나가게 한다.
+      if (onhadaBrowseHallCoverPendingIds.has(exhibitionId)) return;
+      onhadaBrowseHallCoverPendingIds.add(exhibitionId);
+
+      onhadaLoadBrowseHallCoverImage(exhibitionId, path, onhadaPublicExhibitionsRequestSeq);
+    }
+
+    async function onhadaLoadBrowseHallCoverImage(exhibitionId, path, requestSeq) {
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadExhibitionCoverImage(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      // 같은 세대일 때만 pending 표시를 지운다 - 이미 새 세대로 넘어갔다면
+      // onhadaLoadPublicExhibitions()가 이미 새 Set으로 초기화해 뒀으므로
+      // 여기서 지울 대상 자체가 없다(실수로 새 세대의 같은 id를 잘못
+      // 지우는 사고를 막기 위한 조건이다).
+      if (requestSeq === onhadaPublicExhibitionsRequestSeq) {
+        onhadaBrowseHallCoverPendingIds.delete(exhibitionId);
+      }
+
+      // stale 가드: 응답이 오는 사이 새 목록 조회(onhadaLoadPublicExhibitions
+      // 재호출)가 시작됐으면 폐기한다. 검색어 입력으로 인한 재렌더는 같은
+      // 세대 안에서 일어나므로 이 가드에 걸리지 않는다.
+      if (requestSeq !== onhadaPublicExhibitionsRequestSeq) return;
+      if (!result.ok || !result.blob) return; // 실패 시 fallback을 그대로 유지한다.
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      if (requestSeq !== onhadaPublicExhibitionsRequestSeq) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      onhadaBrowseHallCoverBlobUrls.set(exhibitionId, objectUrl);
+
+      // 지금 화면에 그려져 있는 해당 전시관 카드를 다시 조회해 적용한다.
+      // 다운로드 대기 중 검색 필터로 카드 자체가 사라졌다면 조회 결과가
+      // null이라 onhadaApplyBrowseHallCoverImage가 아무 것도 하지 않는다
+      // (Blob은 캐시에 남아 다음 재검색에서 다시 나타나면 즉시 재사용된다).
+      const imgBoxEl = document.querySelector('.hall-img-box[data-exhibition-cover-id="' + exhibitionId + '"]');
+      const fallbackEl = imgBoxEl ? imgBoxEl.querySelector('.hall-card-thumb-fallback') : null;
+      onhadaApplyBrowseHallCoverImage(imgBoxEl, fallbackEl, objectUrl);
+    }
+
     // 페이지 로드 후 1회 호출된다. 실패해도 기존 platformHalls만 정상
     // 표시되어야 하므로 예외를 밖으로 던지지 않는다.
     async function onhadaLoadPublicExhibitions() {
       onhadaPublicExhibitionsRequestSeq += 1;
       const requestSeq = onhadaPublicExhibitionsRequestSeq;
+
+      // 새 "세대"가 시작됐으므로 이전 세대의 대표 이미지 Blob을 전부
+      // revoke하고 캐시를 비운다 - 카드 재렌더(검색어 입력 등)만으로는
+      // 이 블록을 지나지 않으므로 반복 다운로드가 일어나지 않는다.
+      onhadaBrowseHallCoverBlobUrls.forEach(function (url) { URL.revokeObjectURL(url); });
+      onhadaBrowseHallCoverBlobUrls = new Map();
+      onhadaBrowseHallCoverPendingIds = new Set();
 
       let result;
       try {
@@ -4280,10 +4418,11 @@
 
           const imgBox = document.createElement('div');
           imgBox.className = 'hall-img-box';
-          // H/E: cover_image_path는 이번 1차 구현에서 전혀 사용하지 않는다
-          // (대표 이미지 전용 Storage 정책이 아직 없고, 임의 DB 경로를
-          // img.src에 넣지 않기 위함). 값 존재 여부와 무관하게 항상 유형별
-          // CSS 기본 썸네일만 보여준다. DB 문자열은 textContent로만 넣는다.
+          // 대표 이미지(cover_image_path)가 있으면 비공개 버킷에서 Blob으로
+          // 받아 표시하고, 없거나 다운로드에 실패하면 항상 유형별 CSS 기본
+          // 썸네일(fallback)로 되돌아간다 - 둘 다 imgBox 안에 함께 두고
+          // display만 토글한다. DB 문자열(경로 등)은 img의 alt/title/화면
+          // 텍스트 어디에도 노출하지 않는다.
           const themeClass = onhadaGetHallEntranceThemeClass(hall.exhibitionType);
           if (themeClass) imgBox.classList.add(themeClass);
           const fallback = document.createElement('div');
@@ -4292,6 +4431,14 @@
           imgBox.appendChild(fallback);
           imgBox.addEventListener('click', () => enterSupabaseExhibition(hall.supabaseExhibitionId));
           card.appendChild(imgBox);
+
+          if (hall.img) {
+            // 늦게 끝나는 다운로드가 그 사이 다시 그려진(재렌더/재검색) 다른
+            // 카드에 잘못 적용되지 않도록, 완료 시점에 이 전시관 id로 DOM을
+            // 다시 조회한다(캡처한 imgBox 참조를 그대로 쓰지 않는다).
+            imgBox.setAttribute('data-exhibition-cover-id', hall.supabaseExhibitionId);
+            onhadaRenderBrowseHallCoverImage(hall.supabaseExhibitionId, hall.img, imgBox, fallback);
+          }
 
           const infoBox = document.createElement('div');
           infoBox.className = 'hall-info-box';
@@ -6294,6 +6441,43 @@
     let onhadaPublicArtworkDetailPdfWindowResources = new Map();
     let onhadaAdminExhibitions = [];
     let onhadaAdminExhibitionsRequestSeq = 0;
+
+    // 전시관 정보 수정(이름/소개/기관명/주제/대표 이미지) 공용 모달 전용
+    // 상태. 배정 강사 화면(renderManagerView)과 관리자 클라우드 전시관
+    // 목록(renderAdminCloudExhibitions) 양쪽에서 동일한 모달을 공유한다.
+    // onhadaExhibitionInfoEditRequestSeq는 "현재 대표 이미지 다운로드"와
+    // "제출(업로드→RPC→보상 정리)" 두 비동기 흐름의 공통 stale 가드다 -
+    // 모달을 닫거나 다른 전시관으로 다시 열면 값이 증가해, 그 이전
+    // 요청이 늦게 끝나도 이미 닫힌/전환된 모달 화면을 건드리지 않는다.
+    let onhadaExhibitionInfoEditOpen = false;
+    let onhadaExhibitionInfoEditRequestSeq = 0;
+    let onhadaExhibitionInfoEditSubmitting = false;
+    let onhadaExhibitionInfoEditPreviousFocus = null;
+    // { exhibitionId, role: 'manager'|'admin', adminIndex } - role='manager'일
+    // 때는 exhibitionId만 쓰고, role='admin'일 때는 목록 갱신을 위해
+    // adminIndex도 함께 보관한다(실제 UUID는 DOM에 노출하지 않는다는 기존
+    // 원칙과 동일하게, 버튼 클로저에도 index를 넘기고 여기서만 UUID를 다룬다).
+    let onhadaExhibitionInfoEditContext = null;
+    // 모달을 연 시점의 DB cover_image_path(정보만 수정할 때 그대로
+    // 재전달해 "값을 안 바꿨는데 RPC가 NULL로 지워버리는" 사고를 막는다).
+    let onhadaExhibitionInfoEditOriginalCoverPath = null;
+    let onhadaExhibitionInfoEditCurrentCoverBlobUrl = null;
+    let onhadaExhibitionInfoEditNewCoverFile = null;
+    let onhadaExhibitionInfoEditNewCoverPreviewUrl = null;
+    let onhadaExhibitionInfoEditRemoveCoverRequested = false;
+
+    // 신규 Supabase 공개 카드의 대표 이미지 Blob 캐시.
+    // exhibitionId -> objectURL. onhadaLoadPublicExhibitions() 한 번(=한
+    // "세대") 안에서는 같은 전시관 이미지를 반복 다운로드하지 않기 위해
+    // 재사용하고, 매 onhadaLoadPublicExhibitions() 호출 시작 시점에
+    // 전부 revoke 후 새 Map으로 초기화한다(온하다 창작관 CSS 기본
+    // fallback과는 별개의, 순수 다운로드 성공 시에만 채워지는 캐시다).
+    let onhadaBrowseHallCoverBlobUrls = new Map();
+    // 지금 "이 세대" 안에서 다운로드가 진행 중인 exhibitionId 집합.
+    // onhadaBrowseHallCoverBlobUrls(완료된 결과 캐시)와 별개로, "요청은
+    // 이미 보냈고 아직 응답을 못 받은" 상태를 추적해 같은 세대 안 중복
+    // 렌더가 같은 이미지를 두 번 요청하지 않게 한다.
+    let onhadaBrowseHallCoverPendingIds = new Set();
     // 전시관 공개/비공개 전환 전용 잠금. "요청 세대" 역할은 새로 만들지 않고
     // 위 onhadaAdminExhibitionsRequestSeq를 그대로 재사용한다 - 그 값은 이미
     // renderAdminCloudExhibitions()가 목록을 다시 불러올 때마다 증가하므로
@@ -6415,6 +6599,7 @@
         onhadaRevokeCloudPreviewUrls();
         onhadaCloseAdminEntrancePreview();
         onhadaCloseAdminManagerPreview();
+        onhadaCloseExhibitionInfoEditModal();
         onhadaAdminOperatorProfiles = [];
         onhadaAdminSelectedAssignmentExhibitionId = null;
         onhadaAdminExhibitionManagers = [];
@@ -6449,6 +6634,7 @@
         onhadaResetManagerUnifiedState();
         const unifiedSectionEl = document.getElementById('onhada-manager-unified-section');
         if (unifiedSectionEl) unifiedSectionEl.style.display = 'none';
+        onhadaCloseExhibitionInfoEditModal();
         switchView('browse');
       }
       showAlertDialog("로그아웃 완료", "운영자 세션이 안전하게 종료되었습니다.", "🔒");
@@ -9432,6 +9618,427 @@
       });
     }
 
+    // =========================================================================
+    // 전시관 정보 수정(이름/소개/기관명/주제/대표 이미지) 공용 모달.
+    // 배정 강사 화면과 관리자 클라우드 전시관 목록이 함께 쓴다. 실제 권한
+    // 판정은 이 모달이나 db-service.js가 아니라 update_managed_exhibition_info
+    // RPC(SECURITY DEFINER)가 profiles.role을 직접 다시 조회해 최종
+    // 결정한다 - 여기서의 role 분기는 화면 진입점을 나누고 목록 캐시를
+    // 어디서 갱신할지 정하는 용도일 뿐이다.
+    // =========================================================================
+
+    function onhadaExhibitionInfoEditKeydownHandler(evt) {
+      if (evt.key === 'Escape' || evt.key === 'Esc') {
+        evt.preventDefault();
+        // 제출 진행 중에는 Esc로도 닫지 않는다(close-x/취소 버튼도 이
+        // 상태에서 disabled). 제출이 끝나면(성공/실패 불문) onhadaSubmitExhibitionInfoEdit의
+        // finally에서 다시 열어 둔 상태 그대로이므로 그 다음 Esc부터는 정상 동작한다.
+        if (onhadaExhibitionInfoEditSubmitting) return;
+        onhadaCloseExhibitionInfoEditModal();
+      }
+    }
+
+    function onhadaShowExhibitionInfoEditCoverFallback() {
+      const img = document.getElementById('onhada-exhibition-info-edit-cover-preview-img');
+      const fallback = document.getElementById('onhada-exhibition-info-edit-cover-preview-fallback');
+      if (img) { img.removeAttribute('src'); img.style.display = 'none'; }
+      if (fallback) fallback.style.display = 'block';
+    }
+
+    // 모달을 연 시점의 현재 cover_image_path를 Blob으로 받아 미리보기에
+    // 반영한다. 다운로드가 끝나기 전에 모달이 닫히거나(requestSeq 변경),
+    // 그 사이 사용자가 이미 새 파일을 고르거나 제거를 요청했다면 이
+    // 결과를 화면에 반영하지 않고 즉시 revoke한다.
+    async function onhadaLoadExhibitionInfoEditCurrentCover(path, requestSeq) {
+      let result;
+      try {
+        result = await window.ONHADA_BACKEND.storage.downloadExhibitionCoverImage(path);
+      } catch (err) {
+        result = { ok: false, blob: null, error: null };
+      }
+
+      if (requestSeq !== onhadaExhibitionInfoEditRequestSeq) return;
+      if (!result.ok || !result.blob) return; // 다운로드 실패해도 폼 자체는 그대로 fallback으로 계속 쓸 수 있다.
+      if (onhadaExhibitionInfoEditNewCoverFile || onhadaExhibitionInfoEditRemoveCoverRequested) return;
+
+      const objectUrl = URL.createObjectURL(result.blob);
+
+      if (requestSeq !== onhadaExhibitionInfoEditRequestSeq || onhadaExhibitionInfoEditNewCoverFile || onhadaExhibitionInfoEditRemoveCoverRequested) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      if (onhadaExhibitionInfoEditCurrentCoverBlobUrl) {
+        URL.revokeObjectURL(onhadaExhibitionInfoEditCurrentCoverBlobUrl);
+      }
+      onhadaExhibitionInfoEditCurrentCoverBlobUrl = objectUrl;
+
+      const img = document.getElementById('onhada-exhibition-info-edit-cover-preview-img');
+      const fallback = document.getElementById('onhada-exhibition-info-edit-cover-preview-fallback');
+      if (img) { img.src = objectUrl; img.style.display = 'block'; }
+      if (fallback) fallback.style.display = 'none';
+    }
+
+    // role='manager'이면 currentManagedExhibitions(이미 로드된 담당 전시관
+    // 캐시)에서, role='admin'이면 onhadaAdminExhibitions[adminIndex]에서
+    // 원본 데이터를 찾는다. 두 경우 모두 추가 네트워크 조회 없이 이미 화면에
+    // 그려져 있는 캐시만 사용한다.
+    function onhadaOpenExhibitionInfoEditModal(exhibitionId, role, adminIndex) {
+      if (onhadaExhibitionInfoEditOpen) return;
+
+      let source = null;
+
+      if (role === 'manager') {
+        if (!isManagerAuthenticated) return;
+        source = currentManagedExhibitions.find(ex => ex.id === exhibitionId) || null;
+      } else if (role === 'admin') {
+        if (!isAdminAuthenticated) return;
+        if (!Array.isArray(onhadaAdminExhibitions) || typeof adminIndex !== 'number' || adminIndex < 0 || adminIndex >= onhadaAdminExhibitions.length) return;
+        const candidate = onhadaAdminExhibitions[adminIndex];
+        if (!candidate || candidate.id !== exhibitionId || candidate.is_external) return;
+        source = candidate;
+      } else {
+        return;
+      }
+
+      if (!source) return;
+
+      onhadaExhibitionInfoEditRequestSeq += 1;
+      const requestSeq = onhadaExhibitionInfoEditRequestSeq;
+
+      onhadaExhibitionInfoEditContext = { exhibitionId: exhibitionId, role: role, adminIndex: adminIndex };
+      onhadaExhibitionInfoEditOriginalCoverPath = source.cover_image_path || null;
+      onhadaExhibitionInfoEditNewCoverFile = null;
+      onhadaExhibitionInfoEditRemoveCoverRequested = false;
+
+      const titleEl = document.getElementById('onhada-exhibition-info-edit-title-input');
+      const descEl = document.getElementById('onhada-exhibition-info-edit-description-input');
+      const orgEl = document.getElementById('onhada-exhibition-info-edit-organization-input');
+      const tagEl = document.getElementById('onhada-exhibition-info-edit-tag-input');
+      const statusEl = document.getElementById('onhada-exhibition-info-edit-status');
+      const fileStatusEl = document.getElementById('onhada-exhibition-info-edit-cover-file-status');
+      const fileInputEl = document.getElementById('onhada-exhibition-info-edit-cover-input');
+      const removeBtn = document.getElementById('onhada-exhibition-info-edit-cover-remove-btn');
+      const submitBtn = document.getElementById('onhada-exhibition-info-edit-submit');
+      const cancelBtn = document.getElementById('onhada-exhibition-info-edit-cancel');
+      const closeXBtn = document.getElementById('onhada-exhibition-info-edit-close-x');
+
+      if (titleEl) titleEl.value = source.title || '';
+      if (descEl) descEl.value = source.description || '';
+      if (orgEl) orgEl.value = source.organization_name || '';
+      if (tagEl) tagEl.value = source.tag || '';
+      if (statusEl) statusEl.textContent = '';
+      if (fileStatusEl) fileStatusEl.textContent = '';
+      if (fileInputEl) fileInputEl.value = '';
+      if (submitBtn) submitBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (closeXBtn) closeXBtn.disabled = false;
+
+      onhadaShowExhibitionInfoEditCoverFallback();
+      if (removeBtn) removeBtn.style.display = onhadaExhibitionInfoEditOriginalCoverPath ? 'inline-block' : 'none';
+
+      if (onhadaExhibitionInfoEditOriginalCoverPath) {
+        onhadaLoadExhibitionInfoEditCurrentCover(onhadaExhibitionInfoEditOriginalCoverPath, requestSeq);
+      }
+
+      onhadaExhibitionInfoEditOpen = true;
+      onhadaExhibitionInfoEditPreviousFocus = document.activeElement;
+
+      const overlay = document.getElementById('onhada-exhibition-info-edit-modal');
+      if (overlay) overlay.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onhadaExhibitionInfoEditKeydownHandler);
+
+      const closeBtn = document.getElementById('onhada-exhibition-info-edit-close-x');
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+    }
+
+    // 제출 중에는 닫지 않는다(제출 중 close-x/취소 버튼 자체가 disabled라
+    // 정상 경로로는 이 함수가 제출 중에 호출될 일이 없지만, 방어적으로
+    // 한 번 더 막는다).
+    // onhadaExhibitionInfoEditSubmitting 여부를 여기서 다시 확인하지 않는다
+    // - onhadaSubmitExhibitionInfoEdit()의 성공 경로가 finally(submitting
+    // 해제)보다 먼저 이 함수를 직접 호출하므로, 여기서 그 플래그를
+    // 확인하면 제출 성공 후 모달이 영영 닫히지 않는다. 사용자가 제출
+    // 중에 직접 닫지 못하게 막는 책임은 (1) close-x/취소 버튼의 disabled
+    // 상태와 (2) onhadaExhibitionInfoEditKeydownHandler의 자체 확인,
+    // 두 곳에서만 진다.
+    function onhadaCloseExhibitionInfoEditModal() {
+      if (!onhadaExhibitionInfoEditOpen) return;
+
+      onhadaExhibitionInfoEditOpen = false;
+      // 진행 중이던 현재 이미지 다운로드 등을 무효화한다.
+      onhadaExhibitionInfoEditRequestSeq += 1;
+
+      if (onhadaExhibitionInfoEditCurrentCoverBlobUrl) {
+        URL.revokeObjectURL(onhadaExhibitionInfoEditCurrentCoverBlobUrl);
+        onhadaExhibitionInfoEditCurrentCoverBlobUrl = null;
+      }
+      if (onhadaExhibitionInfoEditNewCoverPreviewUrl) {
+        URL.revokeObjectURL(onhadaExhibitionInfoEditNewCoverPreviewUrl);
+        onhadaExhibitionInfoEditNewCoverPreviewUrl = null;
+      }
+      onhadaExhibitionInfoEditNewCoverFile = null;
+      onhadaExhibitionInfoEditRemoveCoverRequested = false;
+      onhadaExhibitionInfoEditContext = null;
+      onhadaExhibitionInfoEditOriginalCoverPath = null;
+
+      const overlay = document.getElementById('onhada-exhibition-info-edit-modal');
+      if (overlay) overlay.style.display = 'none';
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onhadaExhibitionInfoEditKeydownHandler);
+
+      const fileInputEl = document.getElementById('onhada-exhibition-info-edit-cover-input');
+      if (fileInputEl) fileInputEl.value = '';
+
+      onhadaShowExhibitionInfoEditCoverFallback();
+
+      const toFocus = onhadaExhibitionInfoEditPreviousFocus;
+      onhadaExhibitionInfoEditPreviousFocus = null;
+      if (toFocus && typeof toFocus.focus === 'function') toFocus.focus();
+    }
+
+    // 새 파일 선택. 검증은 storage-service.js 내부에서도 다시 하지만,
+    // 여기서 먼저 걸러 불필요한 재인코딩/네트워크 시도 없이 바로 안내한다.
+    function onhadaHandleExhibitionCoverFileSelect(event) {
+      const input = event && event.target;
+      const file = input && input.files && input.files[0];
+      const fileStatusEl = document.getElementById('onhada-exhibition-info-edit-cover-file-status');
+
+      if (!file) return;
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (allowedTypes.indexOf(file.type) === -1) {
+        if (fileStatusEl) fileStatusEl.textContent = 'JPG, PNG, WEBP 형식만 선택할 수 있습니다.';
+        if (input) input.value = '';
+        return;
+      }
+
+      if (!(file.size > 0)) {
+        if (fileStatusEl) fileStatusEl.textContent = '빈 파일은 선택할 수 없습니다.';
+        if (input) input.value = '';
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        if (fileStatusEl) fileStatusEl.textContent = '이미지 용량은 5MB를 초과할 수 없습니다.';
+        if (input) input.value = '';
+        return;
+      }
+
+      // 새 파일을 골랐으므로, 대기 중이던 "이미지 제거" 요청은 취소된다.
+      onhadaExhibitionInfoEditRemoveCoverRequested = false;
+
+      if (onhadaExhibitionInfoEditNewCoverPreviewUrl) {
+        URL.revokeObjectURL(onhadaExhibitionInfoEditNewCoverPreviewUrl);
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      onhadaExhibitionInfoEditNewCoverFile = file;
+      onhadaExhibitionInfoEditNewCoverPreviewUrl = previewUrl;
+
+      const img = document.getElementById('onhada-exhibition-info-edit-cover-preview-img');
+      const fallback = document.getElementById('onhada-exhibition-info-edit-cover-preview-fallback');
+      if (img) { img.src = previewUrl; img.style.display = 'block'; }
+      if (fallback) fallback.style.display = 'none';
+
+      const removeBtn = document.getElementById('onhada-exhibition-info-edit-cover-remove-btn');
+      if (removeBtn) removeBtn.style.display = 'inline-block';
+
+      if (fileStatusEl) fileStatusEl.textContent = '새 이미지가 선택되었습니다. 저장을 눌러야 실제로 반영됩니다.';
+    }
+
+    // 대표 이미지 제거 요청. 실제 삭제는 저장(RPC 성공) 이후에만 일어나며,
+    // 여기서는 "제거 예정" 상태로만 표시한다.
+    async function onhadaRequestRemoveExhibitionCover() {
+      const hasCurrentOrStaged = !!onhadaExhibitionInfoEditOriginalCoverPath || !!onhadaExhibitionInfoEditNewCoverFile;
+      if (!hasCurrentOrStaged) return;
+
+      const confirmed = await onhadaConfirmAction(
+        '대표 이미지를 제거합니다. 저장을 눌러야 실제로 반영됩니다.',
+        { title: '대표 이미지 제거', confirmLabel: '이미지 제거', cancelLabel: '취소', danger: true }
+      );
+      if (!confirmed) return;
+      if (!onhadaExhibitionInfoEditOpen) return; // 확인 대기 중 모달이 닫혔을 수 있다.
+
+      if (onhadaExhibitionInfoEditNewCoverPreviewUrl) {
+        URL.revokeObjectURL(onhadaExhibitionInfoEditNewCoverPreviewUrl);
+        onhadaExhibitionInfoEditNewCoverPreviewUrl = null;
+      }
+      onhadaExhibitionInfoEditNewCoverFile = null;
+      onhadaExhibitionInfoEditRemoveCoverRequested = true;
+
+      if (onhadaExhibitionInfoEditCurrentCoverBlobUrl) {
+        URL.revokeObjectURL(onhadaExhibitionInfoEditCurrentCoverBlobUrl);
+        onhadaExhibitionInfoEditCurrentCoverBlobUrl = null;
+      }
+
+      onhadaShowExhibitionInfoEditCoverFallback();
+
+      const removeBtn = document.getElementById('onhada-exhibition-info-edit-cover-remove-btn');
+      if (removeBtn) removeBtn.style.display = 'none';
+
+      const fileInputEl = document.getElementById('onhada-exhibition-info-edit-cover-input');
+      if (fileInputEl) fileInputEl.value = '';
+
+      const fileStatusEl = document.getElementById('onhada-exhibition-info-edit-cover-file-status');
+      if (fileStatusEl) fileStatusEl.textContent = '대표 이미지가 제거 예정입니다. 저장을 눌러야 실제로 반영됩니다.';
+    }
+
+    // 저장 성공 후 원본 목록 캐시와 공개 카드 목록을 갱신한다. 추가
+    // 네트워크 조회가 필요하지만(재조회), 부분 캐시 수기 갱신으로 인한
+    // 불일치 위험보다 안전하다고 판단했다.
+    function onhadaRefreshAfterExhibitionInfoEdit(context) {
+      if (!context) return;
+      if (context.role === 'manager' && isManagerAuthenticated) {
+        renderManagerView();
+      } else if (context.role === 'admin' && isAdminAuthenticated) {
+        renderAdminCloudExhibitions();
+      }
+      onhadaLoadPublicExhibitions();
+    }
+
+    // 제출 orchestration. 정보만 수정(이미지 변경 없음) / 새 이미지로 교체 /
+    // 이미지 제거 세 경로를 모두 다루며, 각 경로의 보상 정리 규칙은 이
+    // 함수 상단 주석이 아니라 각 분기 안의 주석에 그 자리에서 설명한다.
+    async function onhadaSubmitExhibitionInfoEdit(event) {
+      if (event) event.preventDefault();
+      if (!onhadaExhibitionInfoEditOpen || !onhadaExhibitionInfoEditContext) return;
+      if (onhadaExhibitionInfoEditSubmitting) return; // 중복 제출 차단
+
+      const requestSeq = onhadaExhibitionInfoEditRequestSeq;
+      const context = onhadaExhibitionInfoEditContext;
+
+      const titleEl = document.getElementById('onhada-exhibition-info-edit-title-input');
+      const descEl = document.getElementById('onhada-exhibition-info-edit-description-input');
+      const orgEl = document.getElementById('onhada-exhibition-info-edit-organization-input');
+      const tagEl = document.getElementById('onhada-exhibition-info-edit-tag-input');
+      const statusEl = document.getElementById('onhada-exhibition-info-edit-status');
+      const submitBtn = document.getElementById('onhada-exhibition-info-edit-submit');
+      const cancelBtn = document.getElementById('onhada-exhibition-info-edit-cancel');
+      const closeXBtn = document.getElementById('onhada-exhibition-info-edit-close-x');
+
+      const titleValue = titleEl ? titleEl.value : '';
+      if (!titleValue || !titleValue.trim()) {
+        if (statusEl) statusEl.textContent = '전시관 이름을 입력해 주세요.';
+        return;
+      }
+
+      onhadaExhibitionInfoEditSubmitting = true;
+      if (submitBtn) submitBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      if (closeXBtn) closeXBtn.disabled = true;
+      if (statusEl) statusEl.textContent = '저장 중입니다...';
+
+      // 이번 제출에서 새로 올린 파일의 경로(있다면). RPC 실패 시 이 경로만
+      // 보상 삭제 대상이며, 기존(교체 전) 이미지나 외부 URL/작품 파일은
+      // 이 변수에 절대 담기지 않는다.
+      let newUploadedPath = null;
+
+      try {
+        let coverImagePathForRpc;
+
+        if (onhadaExhibitionInfoEditNewCoverFile) {
+          // 1) 새 이미지로 교체 - 새 UUID 경로로 먼저 업로드한다.
+          let uploadResult;
+          try {
+            uploadResult = await window.ONHADA_BACKEND.storage.uploadExhibitionCoverImage(context.exhibitionId, onhadaExhibitionInfoEditNewCoverFile);
+          } catch (err) {
+            uploadResult = { ok: false, path: null, error: null };
+          }
+
+          if (requestSeq !== onhadaExhibitionInfoEditRequestSeq) return; // stale: 모달이 이미 닫혔거나 다른 대상으로 전환됨
+
+          if (!uploadResult.ok) {
+            // 업로드 실패 - RPC를 실행하지 않는다. 기존 정보·이미지 그대로 유지.
+            if (statusEl) statusEl.textContent = (uploadResult.error && uploadResult.error.message) || '이미지 업로드에 실패했습니다.';
+            return;
+          }
+
+          newUploadedPath = uploadResult.path;
+          coverImagePathForRpc = uploadResult.path;
+        } else if (onhadaExhibitionInfoEditRemoveCoverRequested) {
+          // 2) 이미지 제거 - Storage 업로드 없음. RPC에 NULL을 전달한다.
+          coverImagePathForRpc = null;
+        } else {
+          // 3) 정보만 수정 - Storage 업로드 0회. 기존 cover_image_path를
+          //    그대로 다시 전달해(값을 바꾸지 않음) RPC가 실수로 NULL로
+          //    지우지 않게 한다.
+          coverImagePathForRpc = onhadaExhibitionInfoEditOriginalCoverPath;
+        }
+
+        let updateResult;
+        try {
+          updateResult = await window.ONHADA_BACKEND.db.updateManagedExhibitionInfoAsUser({
+            target_exhibition_id: context.exhibitionId,
+            p_title: titleValue,
+            p_description: descEl ? descEl.value : '',
+            p_organization_name: orgEl ? orgEl.value : '',
+            p_tag: tagEl ? tagEl.value : '',
+            p_cover_image_path: coverImagePathForRpc
+          });
+        } catch (err) {
+          updateResult = { ok: false, exhibition: null, previousCoverImagePath: null, error: null };
+        }
+
+        if (requestSeq !== onhadaExhibitionInfoEditRequestSeq) {
+          // stale: 모달이 이미 닫히거나 전환된 뒤 응답이 왔다. 그래도 방금
+          // 올린 새 이미지가 있는데 RPC가 실패했다면, 다음에 다시 열릴
+          // 모달과 무관하게 지금 바로 보상 삭제한다(고아 파일 방지).
+          if (newUploadedPath && !updateResult.ok) {
+            window.ONHADA_BACKEND.storage.removeExhibitionCoverImage(newUploadedPath).catch(function () {});
+          }
+          return;
+        }
+
+        if (!updateResult.ok) {
+          // RPC 실패 - 새로 올린 이미지가 있으면 보상 삭제한다. DB는 애초에
+          // 바뀌지 않았으므로 기존 정보·이미지가 그대로 유지된다.
+          if (newUploadedPath) {
+            try {
+              await window.ONHADA_BACKEND.storage.removeExhibitionCoverImage(newUploadedPath);
+            } catch (err) {
+              // 보상 삭제 실패는 조용히 넘어간다 - 사용자에게는 원래
+              // 실패 사유(아래)만 보여준다.
+            }
+          }
+          if (statusEl) statusEl.textContent = (updateResult.error && updateResult.error.message) || '전시관 정보 수정에 실패했습니다.';
+          return;
+        }
+
+        // RPC 성공. 이전 대표 이미지가 있었고 새 값과 다를 때만(=실제로
+        // 교체되었거나 제거되었을 때만) 이전 파일을 정리한다. 이 삭제가
+        // 실패해도 이미 성공한 DB 결과는 절대 되돌리지 않는다 - 실패를
+        // 조용히 무시할 뿐, 사용자에게는 "저장 완료"로 계속 진행한다.
+        //
+        // previousPath가 이 RPC 배포 이전의 과거 형식(신규 전용 버킷 경로
+        // 형식이 아님)이면 실제 Storage 객체가 없거나 이 버킷 규칙과
+        // 맞지 않으므로 삭제를 시도하지 않는다 - isValidExhibitionCoverPath는
+        // removeExhibitionCoverImage가 내부에서 쓰는 것과 동일한 검사기라
+        // 별도로 재구현하지 않는다.
+        const previousPath = updateResult.previousCoverImagePath;
+        const newPath = updateResult.exhibition && updateResult.exhibition.cover_image_path;
+        if (previousPath && previousPath !== newPath && window.ONHADA_BACKEND.storage.isValidExhibitionCoverPath(previousPath)) {
+          try {
+            await window.ONHADA_BACKEND.storage.removeExhibitionCoverImage(previousPath);
+          } catch (err) {
+            // 조용히 무시.
+          }
+        }
+
+        if (requestSeq !== onhadaExhibitionInfoEditRequestSeq) return;
+
+        onhadaRefreshAfterExhibitionInfoEdit(context);
+        showAlertDialog('저장 완료', '전시관 정보가 저장되었습니다.', '✔️');
+        onhadaCloseExhibitionInfoEditModal();
+      } finally {
+        onhadaExhibitionInfoEditSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+        if (closeXBtn) closeXBtn.disabled = false;
+      }
+    }
+
     // renderAllViews()에는 포함하지 않는다 - manager 로그인 성공 또는
     // 운영자 메뉴 진입 시에만 명시적으로 호출해 화면 전환마다
     // Supabase 조회가 반복되지 않게 한다.
@@ -9510,6 +10117,17 @@
         selectBtn.textContent = "전시관 선택";
         selectBtn.addEventListener('click', () => onhadaSelectManagedExhibition(ex.id));
         card.appendChild(selectBtn);
+
+        // 배정된(비외부) 전시관에만 표시된다 - is_external=true 전시관은
+        // assignExhibitionManager()가 애초에 강사 배정 자체를 거부하므로
+        // currentManagedExhibitions에 그런 행이 들어올 수 없다.
+        const editInfoBtn = document.createElement('button');
+        editInfoBtn.type = 'button';
+        editInfoBtn.className = "btn-hero-secondary";
+        editInfoBtn.style.cssText = "width:100%; margin-top:8px;";
+        editInfoBtn.textContent = "전시관 정보 수정";
+        editInfoBtn.addEventListener('click', () => onhadaOpenExhibitionInfoEditModal(ex.id, 'manager', null));
+        card.appendChild(editInfoBtn);
 
         if (listEl) listEl.appendChild(card);
       });
@@ -10492,6 +11110,24 @@
           previewBtnRow.appendChild(managerPreviewBtn);
 
           row.appendChild(previewBtnRow);
+
+          // 전시관 정보 수정(이름/소개/기관명/주제/대표 이미지) - 공개/운영
+          // 상태·강사 배정 버튼과는 완전히 별도 행으로 분리해 서로
+          // 겹치지 않게 배치한다. is_external 전시관은 이 if 블록
+          // 진입 자체가 막혀 있어(위 `if (!ex.is_external)`) 버튼이
+          // 생성되지 않는다.
+          const editInfoRow = document.createElement('div');
+          editInfoRow.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin-top: 10px;";
+
+          const editInfoBtn = document.createElement('button');
+          editInfoBtn.type = 'button';
+          editInfoBtn.className = 'btn-hero-secondary';
+          editInfoBtn.style.cssText = "font-size: 0.85rem; padding: 6px 16px;";
+          editInfoBtn.textContent = '전시관 정보 수정';
+          editInfoBtn.addEventListener('click', () => onhadaOpenExhibitionInfoEditModal(ex.id, 'admin', index));
+          editInfoRow.appendChild(editInfoBtn);
+
+          row.appendChild(editInfoRow);
 
           // B: 공개/비공개 전환. 정확히 두 상태 조합에서만 버튼을 붙이고,
           // 그 밖의 조합(unlisted/beta/ended, 서로 불일치하는 조합 포함)은
