@@ -128,6 +128,108 @@
         }
     }
 
+    // 배정된 강사(자기 담당 전시관만) 또는 관리자(모든 비외부 전시관)가
+    // title/description/organization_name/tag/cover_image_path만 수정한다.
+    // 권한의 최종 판정은 이 함수가 아니라 update_managed_exhibition_info
+    // RPC(SECURITY DEFINER)가 profiles.role을 직접 다시 조회해 내리므로,
+    // 여기서의 role 확인은 불필요한 네트워크 왕복을 줄이기 위한 사전
+    // 확인일 뿐이다. payload는 아래 6개 키만 명시적으로 꺼내 새 객체를
+    // 만들어 RPC에 전달하므로, payload에 visibility/operation_status/
+    // legacy_id/external_url/is_external/exhibition_type/담당자 정보 등이
+    // 섞여 있어도 그 값들은 절대 RPC로 전달되지 않는다.
+    async function updateManagedExhibitionInfoAsUser(payload) {
+        const auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, exhibition: null, error: safeError('auth_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        const context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, exhibition: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        const role = context.profile && context.profile.role;
+        if (role !== 'admin' && role !== 'manager') {
+            return { ok: false, exhibition: null, error: safeError('role_not_allowed', '전시관 정보 수정은 운영자 또는 관리자 계정만 가능합니다.') };
+        }
+
+        if (!payload || typeof payload !== 'object') {
+            return { ok: false, exhibition: null, error: safeError('invalid_input', '입력값이 올바르지 않습니다.') };
+        }
+
+        if (!isValidUuid(payload.target_exhibition_id)) {
+            return { ok: false, exhibition: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        const title = typeof payload.p_title === 'string' ? payload.p_title.trim() : '';
+        if (!title || title.length > 100) {
+            return { ok: false, exhibition: null, error: safeError('invalid_title', '전시관 이름을 100자 이내로 입력해 주세요.') };
+        }
+
+        const descriptionTrimmed = typeof payload.p_description === 'string' ? payload.p_description.trim() : '';
+        if (descriptionTrimmed.length > 1000) {
+            return { ok: false, exhibition: null, error: safeError('invalid_description', '전시관 소개는 1000자를 초과할 수 없습니다.') };
+        }
+
+        const organizationNameTrimmed = typeof payload.p_organization_name === 'string' ? payload.p_organization_name.trim() : '';
+        if (organizationNameTrimmed.length > 100) {
+            return { ok: false, exhibition: null, error: safeError('invalid_organization_name', '소속 기관명은 100자를 초과할 수 없습니다.') };
+        }
+
+        const tagTrimmed = typeof payload.p_tag === 'string' ? payload.p_tag.trim() : '';
+        if (tagTrimmed.length > 50) {
+            return { ok: false, exhibition: null, error: safeError('invalid_tag', '전시 주제는 50자를 초과할 수 없습니다.') };
+        }
+
+        const coverImagePath = (typeof payload.p_cover_image_path === 'string' && payload.p_cover_image_path.length > 0)
+            ? payload.p_cover_image_path
+            : null;
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, exhibition: null, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client.rpc('update_managed_exhibition_info', {
+                target_exhibition_id: payload.target_exhibition_id,
+                p_title: title,
+                p_description: descriptionTrimmed.length > 0 ? descriptionTrimmed : null,
+                p_organization_name: organizationNameTrimmed.length > 0 ? organizationNameTrimmed : null,
+                p_tag: tagTrimmed.length > 0 ? tagTrimmed : null,
+                p_cover_image_path: coverImagePath
+            });
+
+            if (error) {
+                return { ok: false, exhibition: null, error: safeError('exhibition_info_update_failed', '전시관 정보 수정에 실패했습니다.') };
+            }
+
+            const rows = Array.isArray(data) ? data : [];
+            if (rows.length !== 1) {
+                return { ok: false, exhibition: null, error: safeError('exhibition_info_update_failed', '전시관 정보 수정에 실패했습니다.') };
+            }
+
+            const row = rows[0];
+            return {
+                ok: true,
+                previousCoverImagePath: row.previous_cover_image_path,
+                exhibition: {
+                    id: row.id,
+                    title: row.title,
+                    description: row.description,
+                    organization_name: row.organization_name,
+                    tag: row.tag,
+                    cover_image_path: row.cover_image_path,
+                    updated_at: row.updated_at
+                },
+                error: null
+            };
+        } catch (err) {
+            return { ok: false, exhibition: null, error: safeError('unexpected_error', '전시관 정보 수정 중 오류가 발생했습니다.') };
+        }
+    }
+
     async function getManagedArtworks(exhibitionId) {
         if (!exhibitionId) {
             return { ok: false, artworks: [], error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
@@ -2441,6 +2543,7 @@
 
     window.ONHADA_BACKEND.db = {
         getMyManagedExhibitions: getMyManagedExhibitions,
+        updateManagedExhibitionInfoAsUser: updateManagedExhibitionInfoAsUser,
         getManagedArtworks: getManagedArtworks,
         getCategories: getCategories,
         getPublicExhibitions: getPublicExhibitions,
