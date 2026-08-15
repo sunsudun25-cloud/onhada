@@ -534,6 +534,26 @@
       gap: 30px;
     }
 
+    /* 실제 운영 섹션 grid 전용 - 이 클래스가 붙는 곳(현재 운영 중인
+       전시관 섹션)에서만 열 수를 명시적으로 고정한다. 강사 실증/데모
+       섹션은 여전히 위 .halls-grid의 auto-fill 유동 열을 그대로 쓴다.
+       모바일 1열 → 태블릿(768px+) 2열 → 데스크톱(1200px+) 4열. 카드가
+       4개보다 적어도(검색 결과 등) repeat(4,1fr)은 고정 열폭이라 카드가
+       빈 공간을 채우려 지나치게 늘어나지 않는다. */
+    .halls-grid-operational {
+      grid-template-columns: repeat(1, 1fr);
+    }
+    @media (min-width: 768px) {
+      .halls-grid-operational {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (min-width: 1200px) {
+      .halls-grid-operational {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
     .hall-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -812,6 +832,31 @@
 
     .gallery-card-item:hover img, .gallery-card-item:hover video {
       transform: scale(1.05);
+    }
+
+    /* 공개 Supabase 작품 카드(renderPublicSupabaseArtworks) 전용. 기존
+       .img-wrapper/img 규칙은 높이를 지정하지 않아 원본 이미지의 원본
+       비율 그대로 카드 폭에 맞춰 렌더된다 - 가로로 매우 넓은 이미지(예:
+       4:1 이상)는 이 때문에 몇십 px짜리 얇은 띠로 압축되어 "이미지가
+       없는 빈 카드"처럼 보인다(실제로는 <img>가 정상 로드·렌더되고
+       있었다). 이 전용 클래스가 붙은 카드에만 고정 비율을 줘 모든
+       비율의 이미지가 항상 같은 높이로, 명확히 보이는 크기로 표시되게
+       한다. 관리자/강사 화면이나 로컬 데모 갤러리(같은 .gallery-card-item
+       클래스를 쓰지만 이 클래스는 없음)에는 전혀 영향을 주지 않는다.
+       object-fit은 cover가 아닌 contain을 쓴다 - 전시 작품은 쇼핑몰
+       대표 이미지와 달리 구도 전체(네 모서리)가 보여야 하므로, 잘라내는
+       대신 남는 여백을 카드 배경과 어울리는 --bg-dark로 채운다(레터박스/
+       필러박스). 이미지 원본 비율 자체는 전혀 변형하지 않는다. */
+    .gallery-card-item .img-wrapper.public-artwork-thumb {
+      aspect-ratio: 16 / 9;
+      background: var(--bg-dark);
+    }
+    .gallery-card-item .img-wrapper.public-artwork-thumb img,
+    .gallery-card-item .img-wrapper.public-artwork-thumb video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
     }
 
     .gallery-card-info {
@@ -4694,7 +4739,7 @@
 
     // 섹션 1개(제목+설명+grid)의 뼈대만 만들어 반환한다. 카드는 호출부가
     // 반환된 gridEl에 직접 append한다.
-    function onhadaBuildHallSectionBlock(meta) {
+    function onhadaBuildHallSectionBlock(meta, groupKey) {
       const wrapper = document.createElement('div');
       wrapper.className = 'hall-section-block';
       wrapper.style.marginBottom = '44px';
@@ -4716,6 +4761,12 @@
 
       const grid = document.createElement('div');
       grid.className = 'halls-grid';
+      // 실제 운영 섹션에만 데스크톱 4열 고정 클래스를 추가로 붙인다.
+      // 강사 실증/데모 섹션은 이 조건에 걸리지 않아 기존 auto-fill
+      // 유동 열 그대로 유지된다.
+      if (groupKey === 'real') {
+        grid.classList.add('halls-grid-operational');
+      }
       wrapper.appendChild(grid);
 
       return { wrapperEl: wrapper, gridEl: grid };
@@ -4770,7 +4821,7 @@
         if (hallsInGroup.length === 0) return;
 
         const meta = HALL_SECTION_META[groupKey];
-        const section = onhadaBuildHallSectionBlock(meta);
+        const section = onhadaBuildHallSectionBlock(meta, groupKey);
 
         hallsInGroup.forEach(hall => {
           const cardEl = hall.source === 'supabase'
@@ -5212,9 +5263,15 @@
         // media_type='text' 등 이미지가 아닌 작품은 Storage 다운로드를
         // 전혀 시도하지 않는다. video는 카드에서 영상 자체를 절대 받지
         // 않고 thumbnail_url 이미지만 받는다(재생은 상세보기 모달 전용).
+        // public-artwork-thumb 클래스는 실제로 이미지를 시도하는 이
+        // 두 유형에만 붙인다 - text 등 이미지를 전혀 그리지 않는 카드의
+        // img-wrapper는 기존처럼 높이 0으로 그대로 접혀 있어야 하며,
+        // 빈 16:9 상자가 새로 생기면 안 된다.
         if (art.media_type === 'image') {
+          imgWrapper.classList.add('public-artwork-thumb');
           onhadaLoadPublicArtworkImage(art, requestSeq, exhibitionId, imgWrapper);
         } else if (art.media_type === 'video') {
+          imgWrapper.classList.add('public-artwork-thumb');
           onhadaLoadPublicArtworkVideoCardThumbnail(art, requestSeq, exhibitionId, imgWrapper);
         }
       });
