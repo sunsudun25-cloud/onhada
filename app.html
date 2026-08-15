@@ -5263,16 +5263,29 @@
         // media_type='text' 등 이미지가 아닌 작품은 Storage 다운로드를
         // 전혀 시도하지 않는다. video는 카드에서 영상 자체를 절대 받지
         // 않고 thumbnail_url 이미지만 받는다(재생은 상세보기 모달 전용).
-        // public-artwork-thumb 클래스는 실제로 이미지를 시도하는 이
-        // 두 유형에만 붙인다 - text 등 이미지를 전혀 그리지 않는 카드의
-        // img-wrapper는 기존처럼 높이 0으로 그대로 접혀 있어야 하며,
-        // 빈 16:9 상자가 새로 생기면 안 된다.
+        // public-artwork-thumb 클래스는 실제로 이미지를 시도하는 유형에만
+        // 붙인다 - text 등 이미지를 전혀 그리지 않는 카드의 img-wrapper는
+        // 기존처럼 높이 0으로 그대로 접혀 있어야 하며, 빈 16:9 상자가
+        // 새로 생기면 안 된다.
+        //
+        // media_type='document'이면서 media_url이 .pdf로 끝나지 않는
+        // 작품(실제로는 png/jpg 등 이미지 파일이 document로 업로드된
+        // 경우)은 상세보기(onhadaLoadPublicArtworkDetailMedia, 위 참고)가
+        // 이미 이미지로 취급해 정상 표시하고 있었다 - 카드 목록에는
+        // 이 분기 자체가 없어 어떤 다운로드도 시도하지 않은 채 빈
+        // 썸네일로 남아 있었다(실제 원인: 이미지 크기/비율과 무관, 순수
+        // media_type 분기 누락). 상세보기와 동일한 판정 기준을 그대로
+        // 재사용해 카드도 같은 경로로 이미지를 받는다. PDF인 document는
+        // 기존처럼 카드 썸네일을 만들지 않는다(범위 밖, 무변경).
         if (art.media_type === 'image') {
           imgWrapper.classList.add('public-artwork-thumb');
           onhadaLoadPublicArtworkImage(art, requestSeq, exhibitionId, imgWrapper);
         } else if (art.media_type === 'video') {
           imgWrapper.classList.add('public-artwork-thumb');
           onhadaLoadPublicArtworkVideoCardThumbnail(art, requestSeq, exhibitionId, imgWrapper);
+        } else if (art.media_type === 'document' && !/\.pdf$/i.test(art.media_url || '')) {
+          imgWrapper.classList.add('public-artwork-thumb');
+          onhadaLoadPublicArtworkImage(art, requestSeq, exhibitionId, imgWrapper);
         }
       });
     }
