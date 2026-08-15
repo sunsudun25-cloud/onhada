@@ -620,12 +620,239 @@
         }
     }
 
+    // =====================================================================
+    // MP4 영상(artwork-video-assets 버킷) 전용 - 위 이미지/PDF 관련 상수/검증
+    // 함수와는 완전히 분리해서 둔다. 관리자 위저드는 브라우저가 로컬로
+    // 선택한 File을 그대로 미리보기하므로 업로드 전 다운로드가 필요 없지만,
+    // 공개 상세보기 모달은 이미 업로드된 직접 업로드 영상을 재생하기 위해
+    // downloadArtworkVideo()로 Blob을 받아야 한다.
+    // =====================================================================
+
+    var VIDEO_MAX_FILE_SIZE = 50 * 1024 * 1024; // 52428800, artwork-video-assets 버킷 설정과 동일
+    var VIDEO_MIME_TYPE = 'video/mp4';
+    var VIDEO_FILE_NAME_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.mp4$/i;
+
+    function isValidVideoFileName(value) {
+        return typeof value === 'string' && VIDEO_FILE_NAME_RE.test(value);
+    }
+
+    // removeManagedArtworkVideo() 전용 - isValidDocumentPath()와 동일한
+    // 엄격도의 경로 검증(URL/선행 슬래시/역슬래시/공백/query/fragment/상위
+    // 경로 이동/2개를 초과하는 경로 구간을 모두 거부).
+    function isValidVideoPath(path) {
+        if (typeof path !== 'string' || path.length === 0) return false;
+        if (path.indexOf('://') !== -1) return false;
+        if (path.charAt(0) === '/') return false;
+        if (path.indexOf('\\') !== -1) return false;
+        if (path.indexOf(' ') !== -1) return false;
+        if (path.indexOf('?') !== -1) return false;
+        if (path.indexOf('#') !== -1) return false;
+        if (path.indexOf('..') !== -1) return false;
+
+        var segments = path.split('/');
+        if (segments.length !== 2) return false;
+
+        return isUuidLike(segments[0]) && isValidVideoFileName(segments[1]);
+    }
+
+    function buildVideoPath(exhibitionId) {
+        return exhibitionId + '/' + crypto.randomUUID() + '.mp4';
+    }
+
+    async function uploadManagedArtworkVideo(exhibitionId, file) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, path: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isUuidLike(exhibitionId)) {
+            return { ok: false, path: null, error: safeError('invalid_exhibition_id', '전시관 정보가 올바르지 않습니다.') };
+        }
+
+        if (!(file instanceof File) && !(file instanceof Blob)) {
+            return { ok: false, path: null, error: safeError('invalid_file', '파일 정보가 올바르지 않습니다.') };
+        }
+
+        if (file.type !== VIDEO_MIME_TYPE) {
+            return { ok: false, path: null, error: safeError('unsupported_video_type', 'MP4 파일만 업로드할 수 있습니다.') };
+        }
+
+        if (!(file.size > 0)) {
+            return { ok: false, path: null, error: safeError('empty_file', '파일 내용이 비어 있습니다.') };
+        }
+
+        if (file.size > VIDEO_MAX_FILE_SIZE) {
+            return { ok: false, path: null, error: safeError('video_too_large', '영상 용량은 50MB를 초과할 수 없습니다.') };
+        }
+
+        var auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        var context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, path: null, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, path: null, error: safeError('role_not_allowed', '영상 업로드는 운영자 계정만 가능합니다.') };
+        }
+
+        var db = getDb();
+        if (!db || typeof db.getMyManagedExhibitions !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '전시관 조회 서비스를 사용할 수 없습니다.') };
+        }
+
+        var managedResult = await db.getMyManagedExhibitions();
+        if (!managedResult.ok) {
+            return { ok: false, path: null, error: managedResult.error };
+        }
+
+        var isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionId; });
+        if (!isManaged) {
+            return { ok: false, path: null, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+            return { ok: false, path: null, error: safeError('storage_unavailable', '이 브라우저에서는 영상 업로드를 사용할 수 없습니다.') };
+        }
+
+        // 원본 file.name은 절대 경로 생성에 사용하지 않는다. 경로는 오직
+        // exhibitionId(폴더)와 crypto.randomUUID() + .mp4로만 구성한다.
+        // 영상은 이미지와 달리 Canvas 재인코딩을 하지 않고 원본 Blob(File)을
+        // 그대로 업로드한다(재인코딩은 썸네일 캡처 단계에서만 발생).
+        var path = buildVideoPath(exhibitionId);
+
+        try {
+            var uploadResult = await client.storage
+                .from('artwork-video-assets')
+                .upload(path, file, {
+                    upsert: false,
+                    contentType: VIDEO_MIME_TYPE
+                });
+
+            if (uploadResult.error) {
+                return { ok: false, path: null, error: safeError('upload_failed', '영상 업로드에 실패했습니다.') };
+            }
+
+            return { ok: true, path: path, error: null };
+        } catch (err) {
+            return { ok: false, path: null, error: safeError('upload_failed', '영상 업로드 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 보상 삭제 전용. approved/hidden 상태 작품이 참조하는 파일의 삭제 차단은
+    // Storage RLS(storage_artwork_video_assets_delete_manager)가 최종 방어선이다.
+    // 이 함수는 소유(담당 전시관) 여부만 사전 확인하고, 실제 삭제 가부는
+    // 서버 정책에 맡긴다.
+    async function removeManagedArtworkVideo(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidVideoPath(path)) {
+            return { ok: false, error: safeError('invalid_storage_path', '삭제할 파일 경로가 올바르지 않습니다.') };
+        }
+
+        var auth = getAuth();
+        if (!auth || typeof auth.getCurrentUserContext !== 'function') {
+            return { ok: false, error: safeError('storage_unavailable', '인증 서비스를 사용할 수 없습니다.') };
+        }
+
+        var context = await auth.getCurrentUserContext();
+
+        if (!context || !context.signedIn || !context.userId) {
+            return { ok: false, error: safeError('not_signed_in', '로그인이 필요합니다.') };
+        }
+
+        if (!context.profile || context.profile.role !== 'manager') {
+            return { ok: false, error: safeError('role_not_allowed', '파일 삭제는 운영자 계정만 가능합니다.') };
+        }
+
+        var segments = path.split('/');
+        var exhibitionSegment = segments[0];
+
+        var db = getDb();
+        if (!db || typeof db.getMyManagedExhibitions !== 'function') {
+            return { ok: false, error: safeError('storage_unavailable', '전시관 조회 서비스를 사용할 수 없습니다.') };
+        }
+
+        var managedResult = await db.getMyManagedExhibitions();
+        if (!managedResult.ok) {
+            return { ok: false, error: managedResult.error };
+        }
+
+        var isManaged = managedResult.exhibitions.some(function (ex) { return ex.id === exhibitionSegment; });
+        if (!isManaged) {
+            return { ok: false, error: safeError('not_managed', '담당하지 않는 전시관입니다.') };
+        }
+
+        try {
+            var removeResult = await client.storage.from('artwork-video-assets').remove([path]);
+
+            if (removeResult.error) {
+                return { ok: false, error: safeError('remove_failed', '파일 삭제에 실패했습니다.') };
+            }
+
+            return { ok: true, error: null };
+        } catch (err) {
+            return { ok: false, error: safeError('remove_failed', '파일 삭제 중 오류가 발생했습니다.') };
+        }
+    }
+
+    // 공개 관람객용 직접 업로드 영상 다운로드. downloadArtworkAsset/
+    // downloadArtworkDocument와 동일하게 role 사전 확인을 하지 않는다.
+    // admin/manager/anon 모두 호출할 수 있으며, 실제로 그 경로를 읽을 권한이
+    // 있는지는 storage.objects RLS(storage_artwork_video_assets_select_*)가
+    // 최종 판단한다. removeManagedArtworkVideo()와 동일한 isValidVideoPath()를
+    // 그대로 재사용해 경로를 검증한다. public URL이나 signed URL은 생성하지
+    // 않고, 항상 download()로 받은 Blob만 반환한다. object URL 생성/정리는
+    // 이 서비스가 하지 않고 호출한 UI가 필요할 때 만들고 정리한다.
+    async function downloadArtworkVideo(path) {
+        var client = getClient();
+        if (!client) {
+            return { ok: false, blob: null, error: safeError('storage_unavailable', 'Storage 서비스를 사용할 수 없습니다.') };
+        }
+
+        if (!isValidVideoPath(path)) {
+            return { ok: false, blob: null, error: safeError('invalid_storage_path', '영상 경로 정보가 올바르지 않습니다.') };
+        }
+
+        try {
+            var downloadResult = await client.storage.from('artwork-video-assets').download(path);
+
+            if (downloadResult.error || !downloadResult.data) {
+                return { ok: false, blob: null, error: safeError('download_failed', '영상을 불러오지 못했습니다.') };
+            }
+
+            var blob = downloadResult.data;
+
+            if (blob.type !== VIDEO_MIME_TYPE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_video', '영상 형식이 올바르지 않습니다.') };
+            }
+
+            if (!(blob.size > 0) || blob.size > VIDEO_MAX_FILE_SIZE) {
+                return { ok: false, blob: null, error: safeError('invalid_downloaded_video', '영상 용량이 올바르지 않습니다.') };
+            }
+
+            return { ok: true, blob: blob, mimeType: blob.type, size: blob.size, error: null };
+        } catch (err) {
+            return { ok: false, blob: null, error: safeError('download_failed', '영상 다운로드 중 오류가 발생했습니다.') };
+        }
+    }
+
     window.ONHADA_BACKEND.storage = {
         uploadManagedArtworkImage: uploadManagedArtworkImage,
         removeManagedArtworkAsset: removeManagedArtworkAsset,
         downloadArtworkAsset: downloadArtworkAsset,
         uploadManagedArtworkDocument: uploadManagedArtworkDocument,
         removeManagedArtworkDocument: removeManagedArtworkDocument,
-        downloadArtworkDocument: downloadArtworkDocument
+        downloadArtworkDocument: downloadArtworkDocument,
+        uploadManagedArtworkVideo: uploadManagedArtworkVideo,
+        removeManagedArtworkVideo: removeManagedArtworkVideo,
+        downloadArtworkVideo: downloadArtworkVideo
     };
 })();
