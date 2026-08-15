@@ -437,6 +437,117 @@
         }
     }
 
+    // 카드 목록의 "참여 작가/등록 작품" 수 표시용으로만 쓰는 표시 이름
+    // 정규화. onhadaNormalizeExhibitionTitleForCompare(app.html)와 동일한
+    // NFKC 정규화 + 소문자 변환 원칙을 그대로 따라, 대소문자로만 다른
+    // 영문 이름을 같은 작가로 합친다. 저장값 자체를 바꾸지 않고 집계
+    // 목적의 비교 키로만 사용한다.
+    function normalizeArtistDisplayNameForDedupe(name) {
+        return name.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    // 여러 공개 전시관의 "참여 작가/등록 작품" 수를 한 번의 쿼리로 집계한다.
+    // 전시관 카드 목록을 그릴 때 카드 개수만큼 반복 조회(N+1)하지 않기
+    // 위한 전용 함수다. getPublicArtworksForExhibition()과 동일한 공개
+    // 조건(status='approved' AND exhibitions.visibility='public' AND
+    // exhibitions.operation_status='operating')을 그대로 적용하며,
+    // exhibitions!inner로 그 조건을 질의 자체에 명시하는 이유도 동일하다 -
+    // manager/admin으로 로그인한 세션에서 호출되더라도 다른 RLS 정책이
+    // 함께 적용돼 비공개 전시관의 작품까지 집계되지 않도록, 호출자의
+    // role과 무관하게 "공개 관람객 기준" 집계만 반환하도록 조건을 강제한다.
+    // 집계에 필요한 exhibition_id/artist_display_name 두 컬럼만 조회하고
+    // media_url/thumbnail_url/external_url/share_token/description 등은
+    // 가져오지 않는다. submitted_by나 profiles를 조인하지 않으므로 사용자
+    // 개인정보도 이 쿼리에 포함되지 않는다.
+    //
+    // [알려진 운영 한계] 이 조회는 페이지네이션(.range())을 쓰지 않고
+    // PostgREST 기본 응답 행 수 제한(Supabase 기본값 1000행)에 의존한다.
+    // 현재 전체 승인 작품 수(수십 건)는 이 한계에 전혀 근접하지 않아
+    // 안전하지만, 향후 승인 작품이 수천 건 규모로 늘어나면 일부 전시관의
+    // 집계가 조용히 누락될 수 있다. 이 함수는 "단일 요청으로 카드 목록
+    // 전체 집계"라는 제약을 지키기 위해 의도적으로 반복 요청을 추가하지
+    // 않았으며, 그 규모에 도달하면 커서 기반 페이지네이션이나 서버 측
+    // 집계(RPC/materialized view)로 교체하는 것을 검토해야 한다.
+    async function getPublicArtworkStatsForExhibitions(exhibitionIds) {
+        if (!Array.isArray(exhibitionIds)) {
+            return { ok: false, stats: {}, error: safeError('invalid_exhibition_ids', '전시관 목록이 올바르지 않습니다.') };
+        }
+
+        var uniqueIds = [];
+        var seen = {};
+        for (var i = 0; i < exhibitionIds.length; i++) {
+            var rawId = exhibitionIds[i];
+            var id = isValidUuid(rawId) ? rawId.toLowerCase() : null;
+            if (id && !seen[id]) {
+                seen[id] = true;
+                uniqueIds.push(id);
+            }
+        }
+
+        if (uniqueIds.length === 0) {
+            return { ok: true, stats: {}, error: null };
+        }
+
+        const client = getClient();
+        if (!client) {
+            return { ok: false, stats: {}, error: safeError('client_unavailable', 'Supabase 클라이언트를 사용할 수 없습니다.') };
+        }
+
+        try {
+            const { data, error } = await client
+                .from('artworks')
+                .select(`
+                    exhibition_id,
+                    artist_display_name,
+                    exhibitions!inner (
+                        visibility,
+                        operation_status
+                    )
+                `)
+                .in('exhibition_id', uniqueIds)
+                .eq('status', 'approved')
+                .eq('exhibitions.visibility', 'public')
+                .eq('exhibitions.operation_status', 'operating');
+
+            if (error) {
+                return { ok: false, stats: {}, error: safeError('artwork_stats_fetch_failed', '작품 통계를 불러오지 못했습니다.') };
+            }
+
+            // 요청한 전시관은 작품이 0건이더라도 항상 버킷을 만들어 두어,
+            // 호출부가 "집계 실패로 값이 없는 것"과 "정상 조회된 0"을
+            // 구분할 수 있게 한다(둘 다 반환되는 stats 객체에 키가 존재).
+            var buckets = {};
+            uniqueIds.forEach(function (exId) {
+                buckets[exId] = { artworkCount: 0, artistNames: new Set() };
+            });
+
+            (Array.isArray(data) ? data : []).forEach(function (row) {
+                var bucket = buckets[row.exhibition_id];
+                if (!bucket) return;
+
+                bucket.artworkCount += 1;
+
+                var rawName = typeof row.artist_display_name === 'string' ? row.artist_display_name.trim() : '';
+                if (rawName.length === 0) return;
+
+                bucket.artistNames.add(normalizeArtistDisplayNameForDedupe(rawName));
+            });
+
+            var stats = {};
+            uniqueIds.forEach(function (exId) {
+                var bucket = buckets[exId];
+                stats[exId] = {
+                    artworkCount: bucket.artworkCount,
+                    participantCount: bucket.artistNames.size
+                };
+            });
+
+            return { ok: true, stats: stats, error: null };
+        } catch (err) {
+            return { ok: false, stats: {}, error: safeError('unexpected_error', '작품 통계 조회 중 오류가 발생했습니다.') };
+        }
+    }
+
     async function createManagedArtwork(exhibitionId, input) {
         const client = getClient();
         if (!client) {
@@ -2335,6 +2446,7 @@
         getPublicExhibitions: getPublicExhibitions,
         getPublicArtworksForExhibition: getPublicArtworksForExhibition,
         getPublicArtworkByShareToken: getPublicArtworkByShareToken,
+        getPublicArtworkStatsForExhibitions: getPublicArtworkStatsForExhibitions,
         createManagedArtwork: createManagedArtwork,
         createManagedImageArtwork: createManagedImageArtwork,
         createManagedUnifiedArtwork: createManagedUnifiedArtwork,

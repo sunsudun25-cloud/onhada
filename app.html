@@ -3672,7 +3672,7 @@
   <!-- 아래 네 파일 중 하나라도 수정해 배포할 때는 ?v= 뒤 버전 문자열도 함께 올릴 것 -->
   <script src="js/supabase-client.js?v=20260811-8"></script>
   <script src="js/auth-service.js?v=20260811-8"></script>
-  <script src="js/db-service.js?v=20260811-8"></script>
+  <script src="js/db-service.js?v=20260815-1"></script>
   <script src="js/storage-service.js?v=20260811-8"></script>
 
   <!-- ============================================== -->
@@ -4131,6 +4131,22 @@
 
         const safeId = (ex.legacy_id && onhadaIsSafeHallId(ex.legacy_id)) ? ex.legacy_id : ('supabase-' + ex.id);
 
+        // 신규(로컬 카드와 매칭되지 않은) Supabase 전시관은 exhibition_stats
+        // (외부 Lovable 전시관용 수동 통계)를 쓰지 않고, 위
+        // onhadaLoadPublicExhibitions()가 실시간으로 집계해 둔
+        // onhadaPublicExhibitionStats만 사용한다. 아직 집계가 끝나지
+        // 않았거나(loading) 실패했으면(failed) statsState로 표시해 렌더링
+        // 단계에서 숫자 대신 상태 문구를 보여줄 수 있게 한다.
+        //
+        // hasLiveStats를 Map.has()로 명시적으로 구분하는 이유: 전체 조회가
+        // 성공(ready)했더라도 이 특정 전시관 id만 결과에 없는 예외적인
+        // 경우(예: ex.id가 유효한 UUID 형식이 아니어서
+        // getPublicArtworkStatsForExhibitions 내부에서 걸러진 경우)를
+        // "정상적으로 확인된 0"과 구분하기 위함이다. 그런 경우는 실제로는
+        // 집계하지 못한 것이므로 0으로 단정하지 않고 failed로 표시한다.
+        const hasLiveStats = onhadaPublicExhibitionStats.has(ex.id);
+        const liveStats = hasLiveStats ? onhadaPublicExhibitionStats.get(ex.id) : null;
+
         merged.push({
           id: safeId,
           source: 'supabase',
@@ -4140,8 +4156,11 @@
           tag: ex.tag || '',
           img: ex.cover_image_path || '',
           exhibitionType: ex.exhibition_type || '',
-          count: validArtworkCount || 0,
-          authors: validParticipantCount || 0,
+          count: hasLiveStats ? liveStats.artworkCount : 0,
+          authors: hasLiveStats ? liveStats.participantCount : 0,
+          statsState: hasLiveStats
+            ? 'ready'
+            : (onhadaPublicExhibitionStatsState === 'ready' ? 'failed' : onhadaPublicExhibitionStatsState),
           isRecomm: false,
           isRecent: false,
           isPersonal: false
@@ -4170,7 +4189,51 @@
       onhadaPublicExhibitions = (result && result.ok && Array.isArray(result.exhibitions)) ? result.exhibitions : [];
 
       const searchInputEl = document.getElementById('gallerySearchInput');
+
+      // 전시관 목록만으로 먼저 한 번 그려 카드와 입장 버튼을 즉시 노출한다.
+      // 이 시점에는 신규 Supabase 카드의 통계가 "집계 중…"으로 보이며,
+      // 통계 조회가 실패하거나 오래 걸려도 카드 자체나 입장 버튼은 막히지
+      // 않는다.
+      onhadaPublicExhibitionStats = new Map();
+      onhadaPublicExhibitionStatsState = 'loading';
       renderBrowseHalls(searchInputEl ? searchInputEl.value : "");
+
+      const supabaseExhibitionIds = onhadaPublicExhibitions
+        .map(ex => ex.id)
+        .filter(id => typeof id === 'string' && id.length > 0);
+
+      let statsResult;
+      try {
+        statsResult = await window.ONHADA_BACKEND.db.getPublicArtworkStatsForExhibitions(supabaseExhibitionIds);
+      } catch (err) {
+        statsResult = { ok: false, stats: {}, error: null };
+      }
+
+      // stale 가드: 통계 응답이 오는 사이 새 요청이 시작됐으면 이 결과도 버린다.
+      if (requestSeq !== onhadaPublicExhibitionsRequestSeq) return;
+
+      if (statsResult && statsResult.ok && statsResult.stats && typeof statsResult.stats === 'object') {
+        const newStats = new Map();
+        Object.keys(statsResult.stats).forEach(exId => {
+          newStats.set(exId, statsResult.stats[exId]);
+        });
+        onhadaPublicExhibitionStats = newStats;
+        onhadaPublicExhibitionStatsState = 'ready';
+      } else {
+        onhadaPublicExhibitionStatsState = 'failed';
+      }
+
+      renderBrowseHalls(searchInputEl ? searchInputEl.value : "");
+    }
+
+    // 전시관 카드의 참여 작가/등록 작품 숫자를 상태별로 안전한 문구로
+    // 바꾼다. 조회 실패를 0으로 잘못 보여주지 않기 위해 loading/failed일
+    // 때는 숫자 대신 짧은 문구로 표시한다. label/unit은 항상 고정 문자열만
+    // 넘기고, 사용자 데이터는 여기 관여하지 않는다.
+    function onhadaFormatHallStatsLabel(label, value, unit, statsState) {
+      if (statsState === 'loading') return label + ' 집계 중…';
+      if (statsState === 'failed') return label + ' —';
+      return label + ' ' + value + unit;
     }
 
     // [전시관 둘러보기] 카드 6개 이상 동적 로딩 및 필터링
@@ -4271,11 +4334,11 @@
           metaInfo.style.cssText = "border-top: 1px solid rgba(255,255,255,0.04); padding-top: 12px; margin-top: auto;";
 
           const authorsSpan = document.createElement('span');
-          authorsSpan.textContent = '참여 작가 ' + hall.authors + '명';
+          authorsSpan.textContent = onhadaFormatHallStatsLabel('참여 작가', hall.authors, '명', hall.statsState);
           metaInfo.appendChild(authorsSpan);
 
           const countSpan = document.createElement('span');
-          countSpan.textContent = '등록 작품 ' + hall.count + '점';
+          countSpan.textContent = onhadaFormatHallStatsLabel('등록 작품', hall.count, '점', hall.statsState);
           metaInfo.appendChild(countSpan);
 
           infoBox.appendChild(metaInfo);
@@ -6186,6 +6249,13 @@
     let onhadaCloudPreviewCompleted = new Set();
     let onhadaPublicExhibitions = [];
     let onhadaPublicExhibitionsRequestSeq = 0;
+    // 신규 Supabase 전시관 카드의 실시간 참여 작가/등록 작품 집계.
+    // exhibitionId(UUID) -> { artworkCount, participantCount }. 외부 Lovable
+    // 전시관의 exhibition_stats 수동 통계와는 완전히 분리된 별도 상태다.
+    let onhadaPublicExhibitionStats = new Map();
+    // 'loading' | 'ready' | 'failed'. 조회 실패를 0으로 잘못 표시하지 않기
+    // 위해 렌더링 단계에서 이 상태로 문구를 분기한다.
+    let onhadaPublicExhibitionStatsState = 'loading';
     let activeSupabaseExhibitionId = null;
     let onhadaPublicArtworksRequestSeq = 0;
     let onhadaPublicArtworkBlobUrls = new Map();
