@@ -3727,7 +3727,7 @@
   <script src="js/supabase-client.js?v=20260811-8"></script>
   <script src="js/auth-service.js?v=20260811-8"></script>
   <script src="js/db-service.js?v=20260815-2"></script>
-  <script src="js/storage-service.js?v=20260815-1"></script>
+  <script src="js/storage-service.js?v=20260815-2"></script>
 
   <!-- ============================================== -->
   <!-- [플랫폼 애플리케이션 프레임워크 스크립트] -->
@@ -10010,9 +10010,15 @@
         // 교체되었거나 제거되었을 때만) 이전 파일을 정리한다. 이 삭제가
         // 실패해도 이미 성공한 DB 결과는 절대 되돌리지 않는다 - 실패를
         // 조용히 무시할 뿐, 사용자에게는 "저장 완료"로 계속 진행한다.
+        //
+        // previousPath가 이 RPC 배포 이전의 과거 형식(신규 전용 버킷 경로
+        // 형식이 아님)이면 실제 Storage 객체가 없거나 이 버킷 규칙과
+        // 맞지 않으므로 삭제를 시도하지 않는다 - isValidExhibitionCoverPath는
+        // removeExhibitionCoverImage가 내부에서 쓰는 것과 동일한 검사기라
+        // 별도로 재구현하지 않는다.
         const previousPath = updateResult.previousCoverImagePath;
         const newPath = updateResult.exhibition && updateResult.exhibition.cover_image_path;
-        if (previousPath && previousPath !== newPath) {
+        if (previousPath && previousPath !== newPath && window.ONHADA_BACKEND.storage.isValidExhibitionCoverPath(previousPath)) {
           try {
             await window.ONHADA_BACKEND.storage.removeExhibitionCoverImage(previousPath);
           } catch (err) {

@@ -1094,6 +1094,14 @@
         downloadArtworkVideo: downloadArtworkVideo,
         uploadExhibitionCoverImage: uploadExhibitionCoverImage,
         removeExhibitionCoverImage: removeExhibitionCoverImage,
-        downloadExhibitionCoverImage: downloadExhibitionCoverImage
+        downloadExhibitionCoverImage: downloadExhibitionCoverImage,
+        // removeExhibitionCoverImage/downloadExhibitionCoverImage가 내부적으로
+        // 쓰는 것과 동일한 경로 형식 검사기를 그대로 노출한다(재구현하지
+        // 않음). 호출부(app.html)가 이 신규 전용 버킷 경로 형식이 아닌 값(=
+        // 이 RPC 배포 이전의 과거 형식 cover_image_path 등)에 대해서는
+        // removeExhibitionCoverImage 호출 자체를 생략할지 미리 판단하는
+        // 용도다 - 어차피 removeExhibitionCoverImage도 내부에서 같은 검사로
+        // 거부하지만, 그 경우까지 불필요한 호출을 만들지 않기 위함이다.
+        isValidExhibitionCoverPath: isValidAssetPath
     };
 })();
