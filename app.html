@@ -3447,9 +3447,9 @@
             <div class="form-group" style="text-align: left;">
               <label class="form-label">QR을 생성할 대상 전시관</label>
               <select class="form-control" id="qr-target-select">
-                <option>상상의 바다 갤러리 (중구 평생학습관)</option>
+                <option>상상의 바다 갤러리 (영도구 노인복지관)</option>
                 <option>빛의 사운드 뮤지엄 (동래구 노인복지관)</option>
-                <option>디카시정원 (연산6동 평생학습원)</option>
+                <option>디카시정원 (중구 평생학습관)</option>
               </select>
             </div>
 
@@ -3998,7 +3998,7 @@
         id: "work-2",
         title: "상상의 바다 파도소리",
         author: "박창남 (78세)",
-        institution: "중구 평생학습관",
+        institution: "영도구 노인복지관",
         category: "art",
         image: "온라인 전시장 .png",
         video: "",
@@ -4045,13 +4045,13 @@
     // 전시관 7개 카드 정보 구축
             const INITIAL_HALLS = [
       // 1. 기관 및 주제별 전시관 (10개)
-      { id: "art", title: "상상의 바다 갤러리", center: "중구 평생학습관", tag: "AI 그림책", img: "상상의바다_갤러리.png", count: 24, authors: 8, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://on-sea-gallery.lovable.app" },
+      { id: "art", title: "상상의 바다 갤러리", center: "영도구 노인복지관", tag: "AI 그림책", img: "상상의바다_갤러리.png", count: 24, authors: 8, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://on-sea-gallery.lovable.app" },
       { id: "museum", title: "빛의 사운드 뮤지엄", center: "동래구 노인복지관", tag: "회상곡 영상", img: "온뮤지엄 상세.png", count: 12, authors: 6, isRecomm: true, isRecent: false, isPersonal: false, externalUrl: "https://onmuseum.lovable.app" },
-      { id: "dicasi", title: "디카시정원", center: "연산6동 평생학습원", tag: "사진 & 시", img: "디카시정원_갤러리.png", count: 18, authors: 10, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://dikasi-garden.lovable.app" },
+      { id: "dicasi", title: "디카시정원", center: "중구 평생학습관", tag: "사진 & 시", img: "디카시정원_갤러리.png", count: 18, authors: 10, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://dikasi-garden.lovable.app" },
       // 실시간으로 확인되지 않은 참여작가/등록작품 수를 임의로 만들지
       // 않기 위해 count/authors를 의도적으로 넣지 않는다(카드 렌더 시
       // Number.isFinite 검사로 "작품 감상 가능" 안전 문구로 대체된다).
-      { id: "onart-gallery", title: "상상의 빛 갤러리", center: "", tag: "AI 이미지", img: "온아트상세.png", isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://onartgallery.lovable.app" },
+      { id: "onart-gallery", title: "상상의 빛 갤러리", center: "계명문화대학교 평생학습관", tag: "AI 이미지", img: "온아트상세.png", isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://onartgallery.lovable.app" },
       // externalUrl 없음(의도적) - 과거 실제 "상상의 빛 갤러리" URL과
       // 잘못 연결돼 있던 값을 제거했다. 이 카드는 시연용 데모이며,
       // enterSpecificHall()의 externalUrl truthy 체크에 의해 자동으로
@@ -4186,6 +4186,35 @@
             platformHalls.push(Object.assign({}, onartGalleryHall));
             hallsChanged = true;
           }
+        }
+
+        // (3) 상상의 바다 갤러리(id: "art")의 소속 기관명을 실제 소재지인
+        // "영도구 노인복지관"으로 정정한다. 기존 값이 정확히 예전 잘못된
+        // 값("중구 평생학습관")일 때만 바꾼다 - 관리자가 이미 다른 값으로
+        // 고쳐둔 캐시는 건드리지 않는다. 다른 필드는 전혀 손대지 않는다.
+        const artHall = platformHalls.find(function (h) { return h.id === 'art'; });
+        if (artHall && artHall.center === '중구 평생학습관') {
+          artHall.center = '영도구 노인복지관';
+          hallsChanged = true;
+        }
+
+        // (4) 디카시정원(id: "dicasi")의 소속 기관명을 실제 소재지인
+        // "중구 평생학습관"으로 정정한다. 기존 값이 정확히 예전 값
+        // ("연산6동 평생학습원")일 때만 바꾼다.
+        const dicasiHall = platformHalls.find(function (h) { return h.id === 'dicasi'; });
+        if (dicasiHall && dicasiHall.center === '연산6동 평생학습원') {
+          dicasiHall.center = '중구 평생학습관';
+          hallsChanged = true;
+        }
+
+        // (5) 상상의 빛 갤러리(id: "onart-gallery")의 소속 기관명을
+        // "계명문화대학교 평생학습관"으로 채운다. 기존 값이 빈 문자열일
+        // 때만 채운다 - 관리자가 이미 다른 값을 입력해 둔 캐시는 건드리지
+        // 않는다.
+        const onartHall = platformHalls.find(function (h) { return h.id === 'onart-gallery'; });
+        if (onartHall && !onartHall.center) {
+          onartHall.center = '계명문화대학교 평생학습관';
+          hallsChanged = true;
         }
 
         if (hallsChanged) {
