@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <!-- Open Graph / KakaoTalk Preview Meta Tags -->
-  <meta property="og:title" content="ONHADA - 온하다 플랫폼">
+  <meta property="og:title" content="ON하다 - 시니어 창작·재능공유 플랫폼">
   <meta property="og:description" content="기술이 세대를 연결하여 사회적 참여와 따뜻한 소통을 켜다(ON)">
   <meta property="og:image" content="https://sunsudun25-cloud.github.io/onhada/onhada_og_banner.png">
   <meta property="og:url" content="https://sunsudun25-cloud.github.io/onhada/">
@@ -10,7 +10,7 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ONHADA - 온하다 플랫폼 MVP</title>
+  <title>ON하다 - 시니어 창작·재능공유 플랫폼</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Outfit:wght@400;600;800;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
   <style>
     /* ============================================== */
@@ -134,10 +134,11 @@
     }
 
     .intro-ui h1 {
-      font-size: 6rem;
+      font-size: 5.5rem;
       font-weight: 900;
       margin: 0;
-      letter-spacing: 12px;
+      letter-spacing: 6px;
+      white-space: nowrap;
       background: linear-gradient(135deg, #fff 0%, #FFD700 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -317,6 +318,7 @@
       font-size: 1.8rem;
       font-weight: 900;
       letter-spacing: 3px;
+      white-space: nowrap;
       background: linear-gradient(135deg, #fff 0%, #FFD700 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -1767,8 +1769,9 @@
     @media (max-width: 768px) {
       /* 1. 인트로 포털 조정 */
       .intro-ui h1 {
-        font-size: 3rem !important;
-        letter-spacing: 5px !important;
+        font-size: 2.6rem !important;
+        letter-spacing: 2px !important;
+        white-space: nowrap !important;
         margin-bottom: 5px !important;
       }
       .slogan-single {
@@ -2168,9 +2171,9 @@
     </div>
 
     <div class="intro-ui" id="introUI">
-      <h1>ONHADA</h1>
+      <h1>ON하다</h1>
       <p class="slogan-single">온라인 전시관 플랫폼</p>
-      <p style="color: rgba(255, 215, 0, 0.95); font-weight: 600; margin-bottom: 25px; font-size: 1.05rem; letter-spacing: 1px;">아래 버튼을 눌러 온하다를 시작하세요.</p>
+      <p style="color: rgba(255, 215, 0, 0.95); font-weight: 600; margin-bottom: 25px; font-size: 1.05rem; letter-spacing: 1px;">아래 버튼을 눌러 ON하다를 시작하세요.</p>
       <div class="power-zone">
         <button class="power-btn" id="powerOnBtn">
           <svg class="power-svg" viewBox="0 0 32 32">
@@ -2187,7 +2190,7 @@
     <div id="transitionLayer" class="transition-layer-dark">
     <div class="vision-box">
       <p class="vision-text-gold">
-        ONHADA는 기술이 세대를 연결하여<br>
+        ON하다는 기술이 세대를 연결하여<br>
         <span class="highlight-glow">사회적 참여와 따뜻한 소통을 켜는(ON) 세상을 꿈꿉니다.</span>
       </p>
     </div>
@@ -2202,16 +2205,16 @@
     <header class="app-header">
       <div class="header-container">
         <a href="#" class="logo-group" onclick="switchView('portal-home')">
-          <div class="logo">ONHADA</div>
-          <span class="logo-badge">MVP PLATFORM</span>
+          <div class="logo">ON하다</div>
+          <span class="logo-badge">CREATIVE PLATFORM</span>
         </a>
         
         <nav class="nav-links">
           <button class="nav-item-btn active" id="nav-btn-portal" onclick="switchView('portal-home')">홈 (포털 메인)</button>
           <button class="nav-item-btn" id="nav-btn-browse" onclick="switchView('browse')">전시관 둘러보기</button>
-          <button class="nav-item-btn" id="nav-btn-coach" onclick="switchView('coach')">온하다 코치</button>
+          <button class="nav-item-btn" id="nav-btn-coach" onclick="switchView('coach')">ON하다 코치</button>
           <button class="nav-item-btn" id="nav-btn-apply" onclick="switchView('apply')">기관 전시관 개설</button>
-          <button class="nav-item-btn" id="nav-btn-intro" onclick="switchView('intro')">온하다 소개</button>
+          <button class="nav-item-btn" id="nav-btn-intro" onclick="switchView('intro')">ON하다 소개</button>
           <button class="nav-item-btn" id="nav-btn-admin" onclick="triggerAdminAccess()">운영자 로그인</button>
         </nav>
 
@@ -2243,16 +2246,19 @@
       <div id="view-portal-home" class="app-view active">
         <!-- 1. 플랫폼 비전 & 헤더 타이틀 -->
         <div class="view-title-bar" style="text-align: center; margin-bottom: 40px;">
-          <h2>온하다 연합 전시 플랫폼</h2>
+          <h2>ON하다 시니어 창작·재능공유 플랫폼</h2>
           <p style="font-size: 1.3rem !important; color: var(--accent-color) !important; font-weight: 800; margin-top: 10px;">
-            기술이 세대를 연결하여 사회적 참여와 따뜻한 소통을 켜다(ON)
+            한 사람의 재능을 작품으로 남기고, 개인·기관 전시관으로 세상과 연결합니다.
+          </p>
+          <p style="font-size: 0.95rem; color: #bbb; font-weight: 600; margin-top: 8px;">
+            시니어의 창작과 평생의 재능을 전시하고, 가족·기관·지역사회와 연결합니다.
           </p>
         </div>
 
         <!-- MVP 데모 안내 배너 -->
         <div style="background: rgba(255, 215, 0, 0.05); border: 1px solid rgba(255, 215, 0, 0.2); border-radius: 16px; padding: 15px 25px; margin-bottom: 35px; text-align: center; max-width: 900px; margin-left: auto; margin-right: auto; line-height: 1.6;">
-          <span style="color: var(--accent-color); font-weight: 800; font-size: 0.95rem; display: block; margin-bottom: 4px;">⚠️ MVP DEMO NOTICE</span>
-          <span style="font-size: 0.9rem; color: #eee; word-break: keep-all;">본 화면은 온하다 플랫폼의 향후 확장 운영 구조를 보여주는 MVP 데모입니다. 일부 기관명·작가명·통계는 서비스 시나리오를 설명하기 위한 예시 데이터이며, 실제 현장 실증 현황은 별도로 표시합니다.</span>
+          <span style="color: var(--accent-color); font-weight: 800; font-size: 0.95rem; display: block; margin-bottom: 4px;">⚠️ 플랫폼 운영 안내</span>
+          <span style="font-size: 0.9rem; color: #eee; word-break: keep-all;">ON하다는 실제 운영 전시관과 강사 실증 전시관을 함께 제공합니다. 시연용 공간은 '데모 전시관'으로 구분하여 표시합니다.</span>
         </div>
 
         <!-- 2. 플랫폼 운영 상태판 (실제 실증 vs 확장 예시) -->
@@ -2380,7 +2386,7 @@
               <!-- 메트릭 1 -->
               <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 10px; position: relative;">
                 <span style="font-size: 2rem; font-weight: 900; color: var(--accent-color); display: block; margin-bottom: 6px;"><span id="count-centers">12</span> <small style="font-size: 0.8rem; font-weight: 700; color: rgba(255,215,0,0.6); margin-left: 2px;">DEMO</small></span>
-                <span style="font-size: 0.95rem; color: #bbb; font-weight: 700;">연합 복지기관수</span>
+                <span style="font-size: 0.95rem; color: #bbb; font-weight: 700;">연계 복지기관수</span>
               </div>
               <!-- 메트릭 2 -->
               <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 10px;">
@@ -2485,7 +2491,7 @@
       <!-- ============================================== -->
       <div id="view-coach" class="app-view">
         <div class="view-title-bar">
-          <h2>온하다 AI 코치 <span style="font-size:1.15rem; color:#bfa3ff; font-weight:700; border: 1px solid rgba(191,163,255,0.4); padding: 3px 12px; border-radius:20px; margin-left:12px; vertical-align:middle; display:inline-block;">기능 시연용 프로토타입</span></h2>
+          <h2>ON하다 AI 코치 <span style="font-size:1.15rem; color:#bfa3ff; font-weight:700; border: 1px solid rgba(191,163,255,0.4); padding: 3px 12px; border-radius:20px; margin-left:12px; vertical-align:middle; display:inline-block;">기능 시연용 프로토타입</span></h2>
           <p>한 단계씩 큰 글자를 읽고 따라하며 시와 그림, 동화책, 편지를 손쉽게 만듭니다.</p>
         </div>
 
@@ -2507,7 +2513,16 @@
             
             <!-- 1. ON DICASI -->
             <div id="sub-coach-c-dicasi" class="sub-tab-content active">
-              
+
+              <!-- 실제 연동: ondicasi.lovable.app 실제 작동 버전 진입 -->
+              <div style="margin-bottom: 30px; padding: 24px; border-radius: 20px; background: rgba(232,185,74,0.08); border: 1px solid rgba(232,185,74,0.35); text-align:center;">
+                <p style="font-size:1.1rem; font-weight:800; color:#fff; margin-bottom:10px;">📸 디카시 코치</p>
+                <p style="font-size:0.95rem; color:var(--text-gray); margin-bottom:18px;">사진을 올리면 AI가 실제로 사진을 분석해 짧은 시 3편을 만들어드립니다. (외부 연동 앱)</p>
+                <button class="btn-run-coach" onclick="openExternalIframeModal('https://ondicasi.lovable.app/coach', 'ON하다 디카시 코치')" style="padding: 16px 32px;">🚀 실제 디카시 코치 열기</button>
+              </div>
+
+              <p style="font-size:0.85rem; color:var(--text-gray); margin-bottom:20px;">아래는 기능 설명용 시연 프로토타입입니다.</p>
+
               <!-- 1-1단계 -->
               <div id="dicasi-wizard-step-1" class="coach-wizard-step">
                 <h3 style="font-size: 1.6rem; color: var(--accent-color); margin-bottom: 25px;">[1단계] 사진 가져오기</h3>
@@ -2731,7 +2746,7 @@
             <div class="coach-avatar-header" style="margin-bottom: 25px; padding-bottom: 20px;">
               <div class="avatar" style="font-size: 3rem; width: 70px; height: 70px;">🧙‍♂️</div>
               <div>
-                <h4 style="font-size: 1.4rem; font-weight:900;">온하다 창작 AI 비서</h4>
+                <h4 style="font-size: 1.4rem; font-weight:900;">ON하다 창작 AI 비서</h4>
                 <span style="font-size:0.95rem; color:var(--accent-color); font-weight:700;">Creative Assistant</span>
               </div>
             </div>
@@ -2800,7 +2815,7 @@
             <label class="form-label" style="font-size: 1.2rem; font-weight: 800;">4. 개설할 전시관 종류 선택</label>
             <select class="form-control" id="p-apply-goods" style="font-size: 1.2rem; padding: 18px; height: auto;">
               <option value="동화">📖 AI 드로잉 동화그림책 전시관</option>
-              <option value="음악">🎵 온뮤지엄 - 음악/영상 연합전시관</option>
+              <option value="음악">🎵 온뮤지엄 - 음악/영상 전시관</option>
               <option value="디카시">📸 디카시 스마트폰 사진시화 전시관</option>
             </select>
           </div>
@@ -2846,7 +2861,7 @@
             <h4 style="margin-bottom: 10px; color: #fff;">기관 디지털 교육 안내</h4>
             <p style="color: var(--text-gray); line-height: 1.7; font-size: 0.95rem;">
               본 복지관에서는 매주 화/목 스마트폰 카메라 촬영 교육 및 AI 생성 미술, 디지털 에세이 창작 프로그램을 운영하고 있습니다.<br>
-              고령 수강생들의 따뜻한 열정과 추억이 담긴 작품들을 지역 사회 주민들과 온하다를 통해 매일 소통하고 있습니다.
+              고령 수강생들의 따뜻한 열정과 추억이 담긴 작품들을 지역 사회 주민들과 ON하다를 통해 매일 소통하고 있습니다.
             </p>
           </div>
         </div>
@@ -3438,9 +3453,9 @@
             <div class="form-group" style="text-align: left;">
               <label class="form-label">QR을 생성할 대상 전시관</label>
               <select class="form-control" id="qr-target-select">
-                <option>상상의 바다 갤러리 (중구 평생학습관)</option>
+                <option>상상의 바다 갤러리 (영도구 노인복지관)</option>
                 <option>빛의 사운드 뮤지엄 (동래구 노인복지관)</option>
-                <option>디카시정원 (연산6동 평생학습원)</option>
+                <option>디카시정원 (중구 평생학습관)</option>
               </select>
             </div>
 
@@ -3592,7 +3607,7 @@
   <!-- 관리자 로그인 모달 -->
   <div class="admin-login-overlay" id="admin-login-modal">
     <div class="admin-login-box">
-      <h3 style="font-size: 1.4rem; color: #fff; margin-bottom: 10px;">온하다 운영자 로그인</h3>
+      <h3 style="font-size: 1.4rem; color: #fff; margin-bottom: 10px;">ON하다 운영자 로그인</h3>
       <p style="font-size: 0.9rem; color: var(--text-gray); margin-bottom: 25px;">관리자·강사·기관 및 개인 전시관 운영자 전용입니다.</p>
 
       <input type="email" id="admin-email" class="form-control" placeholder="관리자 이메일" autocomplete="username" style="text-align: center; font-size: 1rem; margin-bottom: 15px;">
@@ -3806,7 +3821,7 @@
         "personal-han": "한복남 어르신이 합성한 회상곡 영상관입니다.\n3곡의 감동적인 자작 음악을 감상합니다.",
         "personal-jeong": "정옥자 어르신이 손주에게 전하는 편지 시집관입니다.\n2점의 정겨운 손글씨 글을 봅니다."
       };
-      return (descriptions[id] || "온하다 플랫폼에서 엄선하여 개설한\n어르신들의 창작 테마 전시관입니다.").replace(/\n/g, "<br>");
+      return (descriptions[id] || "ON하다 플랫폼에서 엄선하여 개설한\n어르신들의 창작 테마 전시관입니다.").replace(/\n/g, "<br>");
     }
 
     // ==============================================
@@ -3989,7 +4004,7 @@
         id: "work-2",
         title: "상상의 바다 파도소리",
         author: "박창남 (78세)",
-        institution: "중구 평생학습관",
+        institution: "영도구 노인복지관",
         category: "art",
         image: "온라인 전시장 .png",
         video: "",
@@ -4036,13 +4051,13 @@
     // 전시관 7개 카드 정보 구축
             const INITIAL_HALLS = [
       // 1. 기관 및 주제별 전시관 (10개)
-      { id: "art", title: "상상의 바다 갤러리", center: "중구 평생학습관", tag: "AI 그림책", img: "상상의바다_갤러리.png", count: 24, authors: 8, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://on-sea-gallery.lovable.app" },
+      { id: "art", title: "상상의 바다 갤러리", center: "영도구 노인복지관", tag: "AI 그림책", img: "상상의바다_갤러리.png", count: 24, authors: 8, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://on-sea-gallery.lovable.app" },
       { id: "museum", title: "빛의 사운드 뮤지엄", center: "동래구 노인복지관", tag: "회상곡 영상", img: "온뮤지엄 상세.png", count: 12, authors: 6, isRecomm: true, isRecent: false, isPersonal: false, externalUrl: "https://onmuseum.lovable.app" },
-      { id: "dicasi", title: "디카시정원", center: "연산6동 평생학습원", tag: "사진 & 시", img: "디카시정원_갤러리.png", count: 18, authors: 10, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://dikasi-garden.lovable.app" },
+      { id: "dicasi", title: "디카시정원", center: "중구 평생학습관", tag: "사진 & 시", img: "디카시정원_갤러리.png", count: 18, authors: 10, isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://dikasi-garden.lovable.app" },
       // 실시간으로 확인되지 않은 참여작가/등록작품 수를 임의로 만들지
       // 않기 위해 count/authors를 의도적으로 넣지 않는다(카드 렌더 시
       // Number.isFinite 검사로 "작품 감상 가능" 안전 문구로 대체된다).
-      { id: "onart-gallery", title: "상상의 빛 갤러리", center: "", tag: "AI 이미지", img: "온아트상세.png", isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://onartgallery.lovable.app" },
+      { id: "onart-gallery", title: "상상의 빛 갤러리", center: "계명문화대학교 평생학습관", tag: "AI 이미지", img: "온아트상세.png", isRecomm: true, isRecent: true, isPersonal: false, externalUrl: "https://onartgallery.lovable.app" },
       // externalUrl 없음(의도적) - 과거 실제 "상상의 빛 갤러리" URL과
       // 잘못 연결돼 있던 값을 제거했다. 이 카드는 시연용 데모이며,
       // enterSpecificHall()의 externalUrl truthy 체크에 의해 자동으로
@@ -4177,6 +4192,35 @@
             platformHalls.push(Object.assign({}, onartGalleryHall));
             hallsChanged = true;
           }
+        }
+
+        // (3) 상상의 바다 갤러리(id: "art")의 소속 기관명을 실제 소재지인
+        // "영도구 노인복지관"으로 정정한다. 기존 값이 정확히 예전 잘못된
+        // 값("중구 평생학습관")일 때만 바꾼다 - 관리자가 이미 다른 값으로
+        // 고쳐둔 캐시는 건드리지 않는다. 다른 필드는 전혀 손대지 않는다.
+        const artHall = platformHalls.find(function (h) { return h.id === 'art'; });
+        if (artHall && artHall.center === '중구 평생학습관') {
+          artHall.center = '영도구 노인복지관';
+          hallsChanged = true;
+        }
+
+        // (4) 디카시정원(id: "dicasi")의 소속 기관명을 실제 소재지인
+        // "중구 평생학습관"으로 정정한다. 기존 값이 정확히 예전 값
+        // ("연산6동 평생학습원")일 때만 바꾼다.
+        const dicasiHall = platformHalls.find(function (h) { return h.id === 'dicasi'; });
+        if (dicasiHall && dicasiHall.center === '연산6동 평생학습원') {
+          dicasiHall.center = '중구 평생학습관';
+          hallsChanged = true;
+        }
+
+        // (5) 상상의 빛 갤러리(id: "onart-gallery")의 소속 기관명을
+        // "계명문화대학교 평생학습관"으로 채운다. 기존 값이 빈 문자열일
+        // 때만 채운다 - 관리자가 이미 다른 값을 입력해 둔 캐시는 건드리지
+        // 않는다.
+        const onartHall = platformHalls.find(function (h) { return h.id === 'onart-gallery'; });
+        if (onartHall && !onartHall.center) {
+          onartHall.center = '계명문화대학교 평생학습관';
+          hallsChanged = true;
         }
 
         if (hallsChanged) {
@@ -4966,7 +5010,7 @@
     // (전시관 생성 폼의 확정 명명 규칙 접두사)를 그대로 재사용해 입구 화면과
     // 카드 기본 썸네일이 동일한 명칭을 쓰도록 한다.
     function onhadaGetHallEntranceTypeLabel(exhibitionType) {
-      return ONHADA_EXHIBITION_TYPE_PREFIX[exhibitionType] || '온하다 전시관';
+      return ONHADA_EXHIBITION_TYPE_PREFIX[exhibitionType] || 'ON하다 전시관';
     }
 
     function onhadaGetHallEntranceThemeClass(exhibitionType) {
@@ -5015,7 +5059,7 @@
 
       const orgEl = document.createElement('p');
       orgEl.className = 'hall-entrance-org';
-      orgEl.textContent = exhibition.organization_name || '온하다와 함께하는 창작전시관';
+      orgEl.textContent = exhibition.organization_name || 'ON하다와 함께하는 창작전시관';
       container.appendChild(orgEl);
 
       if (exhibition.tag) {
@@ -6263,7 +6307,7 @@
     function shareToFamily() {
       showAlertDialog(
         "가족 단톡방 공유 연동",
-        `[온하다 개인전 안내]\n"${activeArtistName} 작가님의 개인 모바일 전시관 링크가 손녀/아들 카카오톡 단톡방 공유 프로토콜로 성공적으로 발송 완료되었습니다."`,
+        `[ON하다 개인전 안내]\n"${activeArtistName} 작가님의 개인 모바일 전시관 링크가 손녀/아들 카카오톡 단톡방 공유 프로토콜로 성공적으로 발송 완료되었습니다."`,
         "🔗"
       );
     }
@@ -6347,7 +6391,7 @@
       // 4. 성공 메시지 띄우고 즉시 전시관 둘러보기 최신 탭으로 화면 이동!
       showAlertDialog(
         "기관 전시관 즉시 개설 완료",
-        `🎉 축하합니다!\n[${org} 시범 전시관]이 플랫폼상에 개설되었습니다.\n\n해당 전시관은 이제 온하다 연합 플랫폼의 '둘러보기' 목록에서 다른 방문객들이 실제로 감상할 수 있습니다.`,
+        `🎉 축하합니다!\n[${org} 시범 전시관]이 플랫폼상에 개설되었습니다.\n\n해당 전시관은 이제 ON하다 플랫폼의 '둘러보기' 목록에서 다른 방문객들이 실제로 감상할 수 있습니다.`,
         "🏢"
       );
 
@@ -10533,9 +10577,9 @@
 
     // 확정된 전시관 명명 규칙 - exhibition_type별 고정 접두어.
     const ONHADA_EXHIBITION_TYPE_PREFIX = {
-      institution: '온하다 예술관',
-      instructor: '온하다 창작관',
-      personal: '온하다 미래관'
+      institution: 'ON하다 예술관',
+      instructor: 'ON하다 창작관',
+      personal: 'ON하다 미래관'
     };
 
     function onhadaAdminExhibitionNameSuffixPlaceholder(exhibitionType) {
